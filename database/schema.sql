@@ -1,2 +1,0 @@
--- Full combined schema
--- This file contains all table definitions
