@@ -1,0 +1,8 @@
+-- Module 14
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  message TEXT,
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
