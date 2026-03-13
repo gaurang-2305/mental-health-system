@@ -1,10 +1,20 @@
-// Module 8 – AI Recommendations
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/recommendation.controller');
+const auth     = require('../middleware/authenticate');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
-const router = express.Router();
+router.use(auth);
 
-router.get('/:userId', (req, res) => {
-  res.json({ message: 'Get recommendations' });
-});
+// GET  /api/recommendations
+router.get('/', ctrl.getRecommendations);
 
-export default router;
+// POST /api/recommendations/generate  — AI-powered
+router.post('/generate', aiLimiter, ctrl.generateRecommendations);
+
+// PATCH /api/recommendations/read-all  — before /:id
+router.patch('/read-all', ctrl.markAllAsRead);
+
+// PATCH /api/recommendations/:id/read
+router.patch('/:id/read', ctrl.markAsRead);
+
+module.exports = router;

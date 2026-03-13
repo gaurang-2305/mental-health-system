@@ -1,12 +1,13 @@
-// Module 28 – RBAC config
-export const roles = {
-  STUDENT: 'student',
-  COUNSELOR: 'counselor',
-  ADMIN: 'admin',
+const ROLES = {
+  STUDENT:   1,
+  COUNSELOR: 2,
+  ADMIN:     3,
 };
 
-export const rolePermissions = {
-  student: ['view_profile', 'submit_survey', 'track_mood'],
-  counselor: ['view_student_data', 'send_recommendations', 'manage_appointments'],
-  admin: ['manage_users', 'view_analytics', 'manage_system'],
+const ROLE_NAMES = {
+  1: 'student',
+  2: 'counselor',
+  3: 'admin',
 };
+
+module.exports = { ROLES, ROLE_NAMES };

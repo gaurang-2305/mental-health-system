@@ -1,10 +1,30 @@
-// Module 13 – Counselor Dashboard
-import express from 'express';
+const router    = require('express').Router();
+const ctrl      = require('../controllers/counselor.controller');
+const auth      = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
+const validate  = require('../middleware/validateInput');
+const { body }  = require('express-validator');
 
-const router = express.Router();
+// All counselor routes require authentication + counselor or admin role
+router.use(auth, authorize('counselor', 'admin'));
 
-router.get('/dashboard/:counselorId', (req, res) => {
-  res.json({ message: 'Get counselor dashboard' });
-});
+// GET  /api/counselor/dashboard
+router.get('/dashboard', ctrl.getDashboard);
 
-export default router;
+// GET  /api/counselor/student-status  — all students with latest mood/stress
+router.get('/student-status', ctrl.getStudentStatus);
+
+// GET  /api/counselor/stress-reports
+router.get('/stress-reports', ctrl.getStressReports);
+
+// GET  /api/counselor/students/:id/overview
+router.get('/students/:id/overview', ctrl.getStudentOverview);
+
+// POST /api/counselor/notes/:student_id  — add counselor note for a student
+router.post('/notes/:student_id',
+  [body('note').trim().notEmpty().withMessage('Note content is required')],
+  validate,
+  ctrl.addNote
+);
+
+module.exports = router;

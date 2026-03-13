@@ -1,10 +1,15 @@
-// Module 27 – Backup & Recovery
-import express from 'express';
+const router    = require('express').Router();
+const ctrl      = require('../controllers/backup.controller');
+const auth      = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
 
-const router = express.Router();
+// All backup routes: admin only
+router.use(auth, authorize('admin'));
 
-router.post('/backup', (req, res) => {
-  res.json({ message: 'Backup created' });
-});
+// GET  /api/backup/tables   — row counts per table
+router.get('/tables', ctrl.getTableStats);
 
-export default router;
+// GET  /api/backup/export?format=json|xlsx&tables=user_profiles,surveys,...
+router.get('/export', ctrl.exportData);
+
+module.exports = router;

@@ -1,14 +1,29 @@
-// Module 6 – Mood Tracker
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/mood.controller');
+const auth     = require('../middleware/authenticate');
+const validate = require('../middleware/validateInput');
+const { body } = require('express-validator');
 
-const router = express.Router();
+router.use(auth);
 
-router.post('/record', (req, res) => {
-  res.json({ message: 'Mood recorded' });
-});
+// GET  /api/mood/latest
+router.get('/latest', ctrl.getLatestMood);
 
-router.get('/:userId', (req, res) => {
-  res.json({ message: 'Get mood history' });
-});
+// GET  /api/mood
+router.get('/', ctrl.getMoodHistory);
 
-export default router;
+// POST /api/mood
+router.post('/',
+  [
+    body('mood_score').isInt({ min: 1, max: 10 }).withMessage('mood_score must be 1–10'),
+    body('mood_emoji').optional().trim(),
+    body('notes').optional().trim(),
+  ],
+  validate,
+  ctrl.recordMood
+);
+
+// DELETE /api/mood/:id
+router.delete('/:id', ctrl.deleteMood);
+
+module.exports = router;

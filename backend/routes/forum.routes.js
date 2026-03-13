@@ -1,14 +1,44 @@
-// Module 16 – Peer Forum
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/forum.controller');
+const auth     = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
+const validate = require('../middleware/validateInput');
+const { body } = require('express-validator');
 
-const router = express.Router();
+router.use(auth);
 
-router.post('/post', (req, res) => {
-  res.json({ message: 'Post created' });
-});
+// Posts
+router.get('/posts',      ctrl.getPosts);
+router.get('/posts/:id',  ctrl.getPost);
 
-router.get('/', (req, res) => {
-  res.json({ message: 'Get forum posts' });
-});
+router.post('/posts',
+  [
+    body('title').trim().notEmpty().withMessage('Title is required'),
+    body('content').trim().notEmpty().withMessage('Content is required'),
+    body('is_anonymous').optional().isBoolean(),
+  ],
+  validate,
+  ctrl.createPost
+);
 
-export default router;
+router.put('/posts/:id',
+  [
+    body('title').optional().trim().notEmpty(),
+    body('content').optional().trim().notEmpty(),
+  ],
+  validate,
+  ctrl.updatePost
+);
+
+router.delete('/posts/:id', ctrl.deletePost);
+
+// Replies
+router.post('/posts/:id/replies',
+  [body('content').trim().notEmpty().withMessage('Reply content is required')],
+  validate,
+  ctrl.createReply
+);
+
+router.delete('/replies/:id', ctrl.deleteReply);
+
+module.exports = router;

@@ -1,21 +1,61 @@
-// Modules 1,2,3
-import express from 'express';
+const router     = require('express').Router();
+const ctrl       = require('../controllers/auth.controller');
+const auth       = require('../middleware/authenticate');
+const { authLimiter } = require('../middleware/rateLimiter');
+const validate   = require('../middleware/validateInput');
+const { body }   = require('express-validator');
 
-const router = express.Router();
+// POST /api/auth/register
+router.post('/register',
+  authLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('full_name').trim().notEmpty().withMessage('Full name is required'),
+    body('role').optional().isIn(['student', 'counselor', 'admin']),
+  ],
+  validate,
+  ctrl.register
+);
 
-router.post('/register', (req, res) => {
-  // Registration logic
-  res.json({ message: 'Register endpoint' });
-});
+// POST /api/auth/login
+router.post('/login',
+  authLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').notEmpty(),
+  ],
+  validate,
+  ctrl.login
+);
 
-router.post('/login', (req, res) => {
-  // Login logic
-  res.json({ message: 'Login endpoint' });
-});
+// POST /api/auth/logout
+router.post('/logout', auth, ctrl.logout);
 
-router.post('/admin-login', (req, res) => {
-  // Admin login logic
-  res.json({ message: 'Admin login endpoint' });
-});
+// POST /api/auth/refresh
+router.post('/refresh',
+  [body('refresh_token').notEmpty()],
+  validate,
+  ctrl.refreshToken
+);
 
-export default router;
+// POST /api/auth/forgot-password
+router.post('/forgot-password',
+  authLimiter,
+  [body('email').isEmail().normalizeEmail()],
+  validate,
+  ctrl.forgotPassword
+);
+
+// PUT /api/auth/update-password
+router.put('/update-password',
+  auth,
+  [body('password').isLength({ min: 8 })],
+  validate,
+  ctrl.updatePassword
+);
+
+// GET /api/auth/me
+router.get('/me', auth, ctrl.me);
+
+module.exports = router;

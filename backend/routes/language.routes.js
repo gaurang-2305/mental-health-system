@@ -1,10 +1,19 @@
-// Module 26
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/language.controller');
+const auth     = require('../middleware/authenticate');
+const validate = require('../middleware/validateInput');
+const { body } = require('express-validator');
 
-const router = express.Router();
+router.use(auth);
 
-router.post('/set', (req, res) => {
-  res.json({ message: 'Language set' });
-});
+// GET  /api/language
+router.get('/', ctrl.getLanguage);
 
-export default router;
+// PUT  /api/language
+router.put('/',
+  [body('language').trim().notEmpty().withMessage('language is required')],
+  validate,
+  ctrl.updateLanguage
+);
+
+module.exports = router;

@@ -1,10 +1,26 @@
-// Module 19
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/lifestyle.controller');
+const auth     = require('../middleware/authenticate');
+const validate = require('../middleware/validateInput');
+const { body } = require('express-validator');
 
-const router = express.Router();
+router.use(auth);
 
-router.post('/log', (req, res) => {
-  res.json({ message: 'Lifestyle logged' });
-});
+router.get('/', ctrl.getLifestyleLogs);
 
-export default router;
+router.post('/',
+  [
+    body('exercise_minutes').optional().isInt({ min: 0 }),
+    body('exercise_type').optional().trim(),
+    body('diet_quality').optional().isInt({ min: 1, max: 5 }),
+    body('water_intake_liters').optional().isFloat({ min: 0 }),
+    body('logged_date').optional().isISO8601().toDate(),
+  ],
+  validate,
+  ctrl.logLifestyle
+);
+
+router.put('/:id',    ctrl.updateLifestyle);
+router.delete('/:id', ctrl.deleteLifestyle);
+
+module.exports = router;

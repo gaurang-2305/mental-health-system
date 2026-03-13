@@ -1,14 +1,35 @@
-// Module 4 – Profile
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/student.controller');
+const auth     = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
+const validate = require('../middleware/validateInput');
+const { body } = require('express-validator');
 
-const router = express.Router();
+// All routes require authentication
+router.use(auth);
 
-router.get('/profile/:userId', (req, res) => {
-  res.json({ message: 'Get profile' });
-});
+// GET  /api/students/profile  — own profile
+router.get('/profile', ctrl.getProfile);
 
-router.put('/profile/:userId', (req, res) => {
-  res.json({ message: 'Update profile' });
-});
+// PUT  /api/students/profile
+router.put('/profile',
+  [
+    body('full_name').optional().trim().notEmpty(),
+    body('age').optional().isInt({ min: 1, max: 120 }),
+    body('phone').optional().trim(),
+    body('language_pref').optional().isLength({ min: 2, max: 5 }),
+  ],
+  validate,
+  ctrl.updateProfile
+);
 
-export default router;
+// GET  /api/students/dashboard  — student's own dashboard summary
+router.get('/dashboard', ctrl.getDashboard);
+
+// GET  /api/students  — counselor/admin: list all students
+router.get('/', authorize('counselor', 'admin'), ctrl.getAllStudents);
+
+// GET  /api/students/:id  — counselor/admin: single student
+router.get('/:id', authorize('counselor', 'admin'), ctrl.getStudentById);
+
+module.exports = router;

@@ -1,14 +1,17 @@
-// Modules 21, 29 – Reports & Export
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/report.controller');
+const auth     = require('../middleware/authenticate');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
-const router = express.Router();
+router.use(auth);
 
-router.get('/weekly/:userId', (req, res) => {
-  res.json({ message: 'Get weekly report' });
-});
+// GET  /api/reports/latest
+router.get('/latest', ctrl.getLatestReport);
 
-router.get('/export/:userId', (req, res) => {
-  res.json({ message: 'Export report' });
-});
+// GET  /api/reports
+router.get('/', ctrl.getReports);
 
-export default router;
+// POST /api/reports/generate  — triggers AI-generated weekly summary
+router.post('/generate', aiLimiter, ctrl.generateWeeklyReport);
+
+module.exports = router;

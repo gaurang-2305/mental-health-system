@@ -1,10 +1,14 @@
-// Module 24 – AI Prediction
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/moodPrediction.controller');
+const auth     = require('../middleware/authenticate');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
-const router = express.Router();
+router.use(auth);
 
-router.get('/predict/:userId', (req, res) => {
-  res.json({ message: 'Mood prediction' });
-});
+// GET  /api/mood-prediction
+router.get('/', ctrl.getPredictions);
 
-export default router;
+// POST /api/mood-prediction/generate
+router.post('/generate', aiLimiter, ctrl.generatePrediction);
+
+module.exports = router;

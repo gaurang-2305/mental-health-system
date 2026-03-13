@@ -1,14 +1,28 @@
-// Module 5 – Survey
-import express from 'express';
+const router   = require('express').Router();
+const ctrl     = require('../controllers/survey.controller');
+const auth     = require('../middleware/authenticate');
+const validate = require('../middleware/validateInput');
+const { body } = require('express-validator');
 
-const router = express.Router();
+router.use(auth);
 
-router.post('/submit', (req, res) => {
-  res.json({ message: 'Survey submitted' });
-});
+// GET  /api/surveys/latest
+router.get('/latest', ctrl.getLatestSurvey);
 
-router.get('/:userId', (req, res) => {
-  res.json({ message: 'Get survey results' });
-});
+// GET  /api/surveys
+router.get('/', ctrl.getSurveys);
 
-export default router;
+// POST /api/surveys
+router.post('/',
+  [
+    body('mood_score').isInt({ min: 1, max: 10 }),
+    body('stress_score').isInt({ min: 1, max: 10 }),
+    body('sleep_hours').isFloat({ min: 0, max: 24 }),
+    body('anxiety_level').isInt({ min: 1, max: 10 }),
+    body('responses').optional().isObject(),
+  ],
+  validate,
+  ctrl.submitSurvey
+);
+
+module.exports = router;

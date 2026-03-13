@@ -1,29 +1,35 @@
-export function calculateStressScore(data) {
-  // Module 9 formula
-  return Math.random() * 100;
-}
+const winston = require('winston');
+const path = require('path');
 
-export function calculateRiskScore(data) {
-  // Module 15 formula
-  return Math.random();
-}
+const { combine, timestamp, printf, colorize, errors } = winston.format;
 
-export function detectAnomaly(data) {
-  // Module 10
-  return false;
-}
+const logFormat = printf(({ level, message, timestamp, stack }) => {
+  return `${timestamp} [${level}]: ${stack || message}`;
+});
 
-export function aggregateAnalytics(data) {
-  // Module 30 – analytics prep
-  return {};
-}
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: combine(
+    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    errors({ stack: true }),
+    logFormat
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: combine(colorize(), timestamp({ format: 'HH:mm:ss' }), logFormat),
+    }),
+    new winston.transports.File({
+      filename: path.join(__dirname, '../logs/error.log'),
+      level: 'error',
+      maxsize: 5 * 1024 * 1024,
+      maxFiles: 5,
+    }),
+    new winston.transports.File({
+      filename: path.join(__dirname, '../logs/combined.log'),
+      maxsize: 10 * 1024 * 1024,
+      maxFiles: 5,
+    }),
+  ],
+});
 
-export async function runCronJobs() {
-  // Scheduled: notifications, backups
-  console.log('Cron jobs running');
-}
-
-export const CONSTANTS = {
-  STRESS_THRESHOLD: 75,
-  CRISIS_THRESHOLD: 0.8,
-};
+module.exports = logger;
