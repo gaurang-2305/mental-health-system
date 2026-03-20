@@ -1,186 +1,181 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
-import { PageLoader } from '../../components/ui/Loader';
-import { formatDateTime, getRelativeTime } from '../../utils/helpers';
-import { useNotification } from '../../context/NotificationContext';
 
-const STATUS_VARIANTS = {
-  pending: 'warning',
-  confirmed: 'success',
-  completed: 'primary',
-  cancelled: 'danger',
-};
+const STATUS_TABS = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
+const statusColor = { pending:'#fbbf24', confirmed:'#34d399', cancelled:'#f87171', completed:'var(--text3)' };
 
-const ManageAppointments = () => {
-  const { user } = useAuth();
-  const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('pending');
-  const { success, error: notify } = useNotification();
+const fmtTime = d => d ? new Date(d).toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const ago     = d => { if(!d)return'—'; const s=Math.floor((Date.now()-new Date(d))/1000); if(s<86400)return`${Math.floor(s/3600)}h ago`; return`${Math.floor(s/86400)}d ago`; };
+
+export default function ManageAppointments() {
+  const { profile } = useAuth();
+  const [appointments, setAppts] = useState([]);
+  const [students, setStudents]  = useState({});   // id → profile
+  const [loading, setLoading]    = useState(true);
+  const [error, setError]        = useState('');
+  const [activeTab, setActiveTab]= useState('Pending');
 
   useEffect(() => {
-    fetchAppointments();
-  }, [filter]);
+    if (profile?.id) fetchData();
+  }, [profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchAppointments = async () => {
+  async function fetchData() {
     setLoading(true);
+    setError('');
     try {
-      let query = supabase
+      // Fetch appointments for this counselor (no FK join — fetch students separately)
+      const { data: apptData, error: apptErr } = await supabase
         .from('appointments')
-        .select('*, user_profiles!appointments_student_id_fkey(full_name, email, phone, class_year)')
-        .order('scheduled_at', { ascending: true });
+        .select('*')
+        .eq('counselor_id', profile.id)
+        .order('scheduled_at', { ascending: false });
 
-      if (filter !== 'all') query = query.eq('status', filter);
+      if (apptErr) throw apptErr;
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setAppointments(data || []);
+      const appts = apptData || [];
+      setAppts(appts);
+
+      // Fetch student profiles separately to avoid FK naming issues
+      const studentIds = [...new Set(appts.map(a => a.student_id).filter(Boolean))];
+      if (studentIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, email, class')
+          .in('id', studentIds);
+
+        const map = {};
+        (profileData || []).forEach(p => { map[p.id] = p; });
+        setStudents(map);
+      }
     } catch (err) {
-      notify('Failed to load appointments');
+      console.error('ManageAppointments error:', err);
+      setError('Failed to load appointments: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const updateStatus = async (id, status) => {
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', id);
+  async function updateStatus(id, status) {
+    const { error: e } = await supabase.from('appointments').update({ status }).eq('id', id);
+    if (e) { alert('Failed to update: ' + e.message); return; }
+    setAppts(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+  }
 
-      if (error) throw error;
-      success(`Appointment ${status}`);
-      fetchAppointments();
-    } catch (err) {
-      notify('Failed to update appointment');
-    }
-  };
+  const filtered = appointments.filter(a =>
+    activeTab === 'All' || a.status?.toLowerCase() === activeTab.toLowerCase()
+  );
 
-  if (loading) return <PageLoader text="Loading appointments..." />;
-
-  const filters = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
+  const pendingCount = appointments.filter(a => a.status === 'pending').length;
 
   return (
-    <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>Manage Appointments</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          {appointments.length} appointment{appointments.length !== 1 ? 's' : ''} {filter !== 'all' ? `(${filter})` : ''}
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 4 }}>Manage Appointments</h1>
+        <p style={{ color: 'var(--text2)', fontSize: 13 }}>
+          {pendingCount} appointment{pendingCount !== 1 ? 's' : ''} (pending)
         </p>
       </div>
 
-      {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {filters.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
+      {/* Error */}
+      {error && (
+        <div style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <span style={{ color: '#f87171', fontSize: 13, flex: 1 }}>⚠️ {error}</span>
+          <button onClick={() => { setError(''); fetchData(); }} style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 8, color: '#f87171', cursor: 'pointer', padding: '4px 12px', fontSize: 12 }}>Retry</button>
+        </div>
+      )}
+
+      {/* Status filter tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {STATUS_TABS.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
             style={{
-              padding: '7px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: filter === f ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
-              color: filter === f ? '#fff' : 'var(--text-secondary)',
-              textTransform: 'capitalize',
-              transition: 'all 0.15s',
-            }}
-          >
-            {f}
+              padding: '7px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === tab ? 600 : 400,
+              background: activeTab === tab ? 'var(--primary)' : 'var(--bg2)',
+              color: activeTab === tab ? '#fff' : 'var(--text2)',
+              border: activeTab === tab ? 'none' : '1px solid var(--border)',
+            }}>
+            {tab}
+            {tab === 'Pending' && pendingCount > 0 && (
+              <span style={{ marginLeft: 6, background: '#fbbf24', color: '#000', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+                {pendingCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      <Card>
-        {appointments.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '14px' }}>
-            📅 No {filter !== 'all' ? filter : ''} appointments found
+      {/* Content */}
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--text3)' }}>
+            <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
+            <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+            Loading appointments...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>📅</div>
+            No {activeTab.toLowerCase()} appointments found
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Student', 'Scheduled', 'Status', 'Notes', 'Actions'].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--text-muted)',
-                        borderBottom: '1px solid var(--border)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {appointments.map((appt) => (
-                  <tr key={appt.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {appt.user_profiles?.full_name || 'Unknown'}
+          <div>
+            {filtered.map((a, i) => {
+              const student = students[a.student_id];
+              const sc = statusColor[a.status] || 'var(--text3)';
+              return (
+                <div key={a.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px',
+                  borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
+                }}>
+                  {/* Student avatar */}
+                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    {student?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{student?.full_name || 'Unknown student'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+                      {student?.email} {student?.class ? `· ${student.class}` : ''}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
+                      📅 {fmtTime(a.scheduled_at)}
+                      {a.notes && <span style={{ marginLeft: 8, color: 'var(--text3)' }}>· {a.notes}</span>}
+                    </div>
+                  </div>
+
+                  {/* Status + actions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: `${sc}20`, padding: '3px 10px', borderRadius: 20, textTransform: 'capitalize' }}>
+                      {a.status}
+                    </span>
+                    {a.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => updateStatus(a.id, 'confirmed')}
+                          style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'rgba(52,211,153,0.15)', color: '#34d399', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                          ✓ Confirm
+                        </button>
+                        <button onClick={() => updateStatus(a.id, 'cancelled')}
+                          style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'rgba(248,113,113,0.12)', color: '#f87171', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                          ✕ Cancel
+                        </button>
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        {appt.user_profiles?.email}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        {formatDateTime(appt.scheduled_at)}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {getRelativeTime(appt.scheduled_at)}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <Badge variant={STATUS_VARIANTS[appt.status] || 'default'}>
-                        {appt.status}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '200px' }}>
-                      {appt.notes || '—'}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {appt.status === 'pending' && (
-                          <>
-                            <Button size="xs" variant="success" onClick={() => updateStatus(appt.id, 'confirmed')}>
-                              Confirm
-                            </Button>
-                            <Button size="xs" variant="danger" onClick={() => updateStatus(appt.id, 'cancelled')}>
-                              Cancel
-                            </Button>
-                          </>
-                        )}
-                        {appt.status === 'confirmed' && (
-                          <Button size="xs" onClick={() => updateStatus(appt.id, 'completed')}>
-                            Complete
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )}
+                    {a.status === 'confirmed' && (
+                      <button onClick={() => updateStatus(a.id, 'completed')}
+                        style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'rgba(79,142,247,0.15)', color: 'var(--primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        Mark Complete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
-};
-
-export default ManageAppointments;
+}

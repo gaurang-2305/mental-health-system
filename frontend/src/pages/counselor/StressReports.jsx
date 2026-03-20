@@ -1,213 +1,159 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
-import Card from '../../components/ui/Card';
-import RiskBadge from '../../components/crisis/RiskBadge';
-import StressChart from '../../components/charts/StressChart';
-import MoodChart from '../../components/charts/MoodChart';
-import { PageLoader } from '../../components/ui/Loader';
-import { formatDate, average } from '../../utils/helpers';
 
-const StressReports = () => {
-  const [students, setStudents] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [studentData, setStudentData] = useState(null);
+const riskColor = { low:'#34d399', moderate:'#fbbf24', high:'#f97316', critical:'#f87171' };
+const riskBg    = { low:'rgba(52,211,153,0.1)', moderate:'rgba(251,191,36,0.1)', high:'rgba(249,115,22,0.1)', critical:'rgba(248,113,113,0.12)' };
+const fmt       = d => d ? new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
+
+export default function StressReports() {
+  const [data, setData]       = useState([]);
+  const [students, setStudents]=useState({});
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const [riskFilter, setRisk] = useState('All');
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const fetchStudents = async () => {
-    setLoading(true);
+  async function fetchData() {
+    setLoading(true); setError('');
     try {
-      const { data: profiles } = await supabase
-        .from('user_profiles')
-        .select('id, full_name, email, class_year')
-        .eq('role_id', 1)
-        .order('full_name');
+      // Get all students
+      const { data: studs, error: se } = await supabase
+        .from('user_profiles').select('id,full_name,email,class').eq('role_id',1).order('full_name');
+      if (se) throw se;
 
-      // Get latest stress scores for each
-      const { data: scores } = await supabase
+      const map = {};
+      (studs||[]).forEach(s => { map[s.id] = s; });
+      setStudents(map);
+
+      const ids = (studs||[]).map(s=>s.id);
+      if (!ids.length) { setData([]); setLoading(false); return; }
+
+      // Get latest stress score per student
+      const { data: scores, error: scE } = await supabase
         .from('stress_scores')
-        .select('user_id, score, risk_level, created_at')
-        .order('created_at', { ascending: false });
+        .select('student_id,score,risk_level,computed_at')
+        .in('student_id', ids)
+        .order('computed_at',{ascending:false});
+      if (scE) throw scE;
 
-      const scoreMap = {};
-      (scores || []).forEach((s) => {
-        if (!scoreMap[s.user_id]) scoreMap[s.user_id] = s;
-      });
+      // Deduplicate — keep latest per student
+      const latest = {};
+      (scores||[]).forEach(s => { if (!latest[s.student_id]) latest[s.student_id] = s; });
 
-      const enriched = (profiles || []).map((p) => ({
-        ...p,
-        latestScore: scoreMap[p.id] || null,
+      // Also get survey count per student
+      const { data: surveys } = await supabase
+        .from('surveys').select('student_id').in('student_id', ids);
+      const surveyCount = {};
+      (surveys||[]).forEach(s => { surveyCount[s.student_id] = (surveyCount[s.student_id]||0) + 1; });
+
+      // Build report rows — include all students, even those with no data
+      const rows = (studs||[]).map(s => ({
+        ...s,
+        stress:      latest[s.id] || null,
+        surveyCount: surveyCount[s.id] || 0,
       }));
 
-      // Sort by risk level (critical first)
-      const riskOrder = { critical: 0, high: 1, moderate: 2, low: 3 };
-      enriched.sort((a, b) => {
-        const aRisk = riskOrder[a.latestScore?.risk_level] ?? 4;
-        const bRisk = riskOrder[b.latestScore?.risk_level] ?? 4;
-        return aRisk - bRisk;
-      });
+      const riskOrder = { critical:0,high:1,moderate:2,low:3 };
+      rows.sort((a,b) => (riskOrder[a.stress?.risk_level]??4) - (riskOrder[b.stress?.risk_level]??4));
+      setData(rows);
+    } catch(err) {
+      setError('Failed to load stress reports: '+(err.message||'Unknown error'));
+    } finally { setLoading(false); }
+  }
 
-      setStudents(enriched);
-    } catch (err) {
-      console.error('Failed to fetch students:', err);
-    } finally {
-      setLoading(false);
-    }
+  const filtered = data.filter(s =>
+    riskFilter==='All' || s.stress?.risk_level===riskFilter.toLowerCase() || (!s.stress && riskFilter==='No Data')
+  );
+
+  const counts = {
+    total:    data.length,
+    critical: data.filter(s=>s.stress?.risk_level==='critical').length,
+    high:     data.filter(s=>s.stress?.risk_level==='high').length,
+    moderate: data.filter(s=>s.stress?.risk_level==='moderate').length,
+    low:      data.filter(s=>s.stress?.risk_level==='low').length,
+    noData:   data.filter(s=>!s.stress).length,
   };
-
-  const fetchStudentDetail = async (studentId) => {
-    setDetailLoading(true);
-    try {
-      const [
-        { data: moods },
-        { data: stresses },
-        { data: surveys },
-      ] = await Promise.all([
-        supabase.from('mood_logs').select('*').eq('user_id', studentId).order('created_at', { ascending: false }).limit(14),
-        supabase.from('stress_scores').select('*').eq('user_id', studentId).order('created_at', { ascending: false }).limit(14),
-        supabase.from('surveys').select('*').eq('user_id', studentId).order('created_at', { ascending: false }).limit(5),
-      ]);
-
-      setStudentData({ moods: moods || [], stresses: stresses || [], surveys: surveys || [] });
-    } catch (err) {
-      console.error('Detail fetch error:', err);
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
-  const handleSelect = (student) => {
-    setSelected(student);
-    fetchStudentDetail(student.id);
-  };
-
-  if (loading) return <PageLoader text="Loading stress reports..." />;
 
   return (
-    <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>Student Stress Reports</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          Monitor stress levels across all students
-        </p>
+    <div style={{ padding:24 }}>
+      <div style={{ marginBottom:24 }}>
+        <h1 style={{ fontFamily:'var(--font-display)',fontSize:'1.5rem',marginBottom:4 }}>Stress Reports</h1>
+        <p style={{ color:'var(--text2)',fontSize:13 }}>Overview of student stress levels across the institution</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1.5fr' : '1fr', gap: '20px' }}>
-        {/* Student list */}
-        <Card title={`Students (${students.length})`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '600px', overflowY: 'auto' }}>
-            {students.map((student) => (
-              <div
-                key={student.id}
-                onClick={() => handleSelect(student)}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  background:
-                    selected?.id === student.id
-                      ? 'rgba(79,142,247,0.15)'
-                      : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${selected?.id === student.id ? 'rgba(79,142,247,0.4)' : 'var(--border)'}`,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {student.full_name}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {student.class_year || 'No class'} · {student.email}
-                    </div>
-                  </div>
-                  {student.latestScore ? (
-                    <RiskBadge risk={student.latestScore.risk_level} size="xs" />
-                  ) : (
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No data</span>
-                  )}
-                </div>
-                {student.latestScore && (
-                  <div style={{ marginTop: '6px' }}>
-                    <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          width: `${student.latestScore.score}%`,
-                          height: '100%',
-                          background:
-                            student.latestScore.risk_level === 'critical'
-                              ? '#f87171'
-                              : student.latestScore.risk_level === 'high'
-                              ? '#f97316'
-                              : student.latestScore.risk_level === 'moderate'
-                              ? '#fbbf24'
-                              : '#34d399',
-                          borderRadius: '2px',
-                        }}
-                      />
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Score: {student.latestScore.score}/100 · {formatDate(student.latestScore.created_at)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+      {error && (
+        <div style={{ background:'rgba(248,113,113,0.12)',border:'1px solid rgba(248,113,113,0.4)',borderRadius:10,padding:'12px 16px',marginBottom:20,display:'flex',gap:10,alignItems:'center' }}>
+          <span style={{ color:'#f87171',fontSize:13,flex:1 }}>⚠️ {error}</span>
+          <button onClick={fetchData} style={{ background:'none',border:'1px solid rgba(248,113,113,0.4)',borderRadius:8,color:'#f87171',cursor:'pointer',padding:'4px 12px',fontSize:12 }}>Retry</button>
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:12,marginBottom:24 }}>
+        {[['Critical',counts.critical,'#f87171'],['High',counts.high,'#f97316'],['Moderate',counts.moderate,'#fbbf24'],['Low',counts.low,'#34d399'],['No Data',counts.noData,'var(--text3)']].map(([label,count,color])=>(
+          <div key={label} style={{ background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px',textAlign:'center',cursor:'pointer',transition:'all 0.15s' }}
+            onClick={() => setRisk(riskFilter===label?'All':label)}>
+            <div style={{ fontSize:'1.6rem',fontWeight:700,color,lineHeight:1 }}>{count}</div>
+            <div style={{ fontSize:11,color:'var(--text3)',marginTop:4 }}>{label}</div>
           </div>
-        </Card>
+        ))}
+      </div>
 
-        {/* Student detail */}
-        {selected && (
-          <div>
-            <Card title={`${selected.full_name} — Detail`} style={{ marginBottom: '16px' }}>
-              {detailLoading ? (
-                <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
-                  Loading...
-                </div>
-              ) : studentData ? (
-                <>
-                  {/* Summary stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
-                    {[
-                      { label: 'Avg Mood', value: studentData.moods.length ? `${average(studentData.moods.map(m => m.mood_score)).toFixed(1)}/10` : 'N/A', icon: '😊' },
-                      { label: 'Avg Stress', value: studentData.stresses.length ? `${Math.round(average(studentData.stresses.map(s => s.score)))}` : 'N/A', icon: '😰' },
-                      { label: 'Surveys', value: studentData.surveys.length, icon: '📋' },
-                    ].map((stat) => (
-                      <div key={stat.label} style={{ textAlign: 'center', padding: '12px', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: '20px', marginBottom: '4px' }}>{stat.icon}</div>
-                        <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{stat.value}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{stat.label}</div>
-                      </div>
-                    ))}
-                  </div>
+      {/* Filter */}
+      <div style={{ display:'flex',gap:6,marginBottom:20,flexWrap:'wrap' }}>
+        {['All','Critical','High','Moderate','Low','No Data'].map(r=>(
+          <button key={r} onClick={()=>setRisk(r)}
+            style={{ padding:'6px 14px',borderRadius:20,border:riskFilter===r?'none':'1px solid var(--border)',background:riskFilter===r?'var(--primary)':'var(--bg2)',color:riskFilter===r?'#fff':'var(--text2)',cursor:'pointer',fontSize:12,fontWeight:riskFilter===r?600:400 }}>
+            {r}
+          </button>
+        ))}
+      </div>
 
-                  {/* Mood chart */}
-                  {studentData.moods.length > 0 && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '10px' }}>Mood (Last 14 days)</div>
-                      <MoodChart data={studentData.moods} height={140} />
+      {loading ? (
+        <div style={{ textAlign:'center',padding:48,color:'var(--text3)' }}>
+          <div style={{ width:32,height:32,border:'3px solid rgba(255,255,255,0.1)',borderTopColor:'var(--primary)',borderRadius:'50%',animation:'spin 0.7s linear infinite',margin:'0 auto 12px' }} />
+          <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+          Loading stress reports...
+        </div>
+      ) : (
+        <div style={{ background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,overflow:'hidden' }}>
+          {/* Table header */}
+          <div style={{ display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr',padding:'10px 18px',borderBottom:'1px solid var(--border)',fontSize:11,fontWeight:600,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px' }}>
+            <span>Student</span><span style={{ textAlign:'center' }}>Risk Level</span><span style={{ textAlign:'center' }}>Score</span><span style={{ textAlign:'center' }}>Surveys</span><span style={{ textAlign:'center' }}>Last Updated</span>
+          </div>
+          {filtered.length === 0 ? (
+            <div style={{ padding:40,textAlign:'center',color:'var(--text3)',fontSize:13 }}>No students match the selected filter.</div>
+          ) : (
+            filtered.map((s,i) => {
+              const risk = s.stress?.risk_level;
+              return (
+                <div key={s.id} style={{ display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr 1fr',padding:'13px 18px',borderBottom:i<filtered.length-1?'1px solid var(--border)':'none',alignItems:'center' }}>
+                  <div style={{ display:'flex',alignItems:'center',gap:10 }}>
+                    <div style={{ width:36,height:36,borderRadius:'50%',background:'var(--primary)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#fff',flexShrink:0 }}>
+                      {s.full_name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
                     </div>
-                  )}
-
-                  {/* Stress chart */}
-                  {studentData.stresses.length > 0 && (
                     <div>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '10px' }}>Stress Scores</div>
-                      <StressChart data={studentData.stresses} height={140} />
+                      <div style={{ fontWeight:600,fontSize:13 }}>{s.full_name}</div>
+                      <div style={{ fontSize:11,color:'var(--text3)' }}>{s.class||'—'}</div>
                     </div>
-                  )}
-                </>
-              ) : null}
-            </Card>
-          </div>
-        )}
-      </div>
+                  </div>
+                  <div style={{ textAlign:'center' }}>
+                    {risk ? (
+                      <span style={{ fontSize:10,fontWeight:700,color:riskColor[risk],background:riskBg[risk],padding:'2px 10px',borderRadius:20,textTransform:'uppercase' }}>{risk}</span>
+                    ) : <span style={{ color:'var(--text3)',fontSize:12 }}>—</span>}
+                  </div>
+                  <div style={{ textAlign:'center',fontWeight:700,color:risk?riskColor[risk]:'var(--text3)',fontSize:14 }}>
+                    {s.stress ? `${s.stress.score}` : '—'}
+                  </div>
+                  <div style={{ textAlign:'center',fontSize:13,color:'var(--text2)' }}>{s.surveyCount}</div>
+                  <div style={{ textAlign:'center',fontSize:11,color:'var(--text3)' }}>{fmt(s.stress?.computed_at)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
-};
-
-export default StressReports;
+}
