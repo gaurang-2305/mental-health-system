@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 
-const baseInputStyle = {
+const baseStyle = {
   width: '100%',
   padding: '10px 14px',
-  borderRadius: '8px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255,255,255,0.05)',
-  color: 'var(--text-primary)',
-  fontSize: '14px',
+  borderRadius: '10px',
+  border: '1.5px solid rgba(160,120,80,0.24)',
+  background: 'rgba(255,252,248,0.9)',
+  color: '#2c1f12',
+  fontSize: '13.5px',
   outline: 'none',
-  transition: 'border-color 0.2s',
+  transition: 'border-color 0.2s, box-shadow 0.2s, background 0.2s',
   boxSizing: 'border-box',
+  fontFamily: "'Outfit', sans-serif",
 };
 
 export const Input = ({
@@ -31,30 +32,22 @@ export const Input = ({
   return (
     <div className={`form-group ${className}`} style={{ marginBottom: '16px', ...containerStyle }}>
       {label && (
-        <label
-          style={{
-            display: 'block',
-            marginBottom: '6px',
-            fontSize: '13px',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-          }}
-        >
+        <label style={{
+          display: 'block', marginBottom: '6px',
+          fontSize: '10.5px', fontWeight: 700,
+          color: '#7a5c44', textTransform: 'uppercase',
+          letterSpacing: '0.7px', fontFamily: "'Outfit', sans-serif",
+        }}>
           {label}
-          {required && <span style={{ color: '#f87171', marginLeft: '3px' }}>*</span>}
+          {required && <span style={{ color: '#b84a4a', marginLeft: '3px' }}>*</span>}
         </label>
       )}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
         {prefix && (
-          <span
-            style={{
-              position: 'absolute',
-              left: '12px',
-              color: 'var(--text-muted)',
-              fontSize: '14px',
-              pointerEvents: 'none',
-            }}
-          >
+          <span style={{
+            position: 'absolute', left: '12px',
+            color: '#c4a882', fontSize: '13px', pointerEvents: 'none',
+          }}>
             {prefix}
           </span>
         )}
@@ -63,12 +56,18 @@ export const Input = ({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
-            ...baseInputStyle,
+            ...baseStyle,
             borderColor: error
-              ? '#f87171'
+              ? 'rgba(184,74,74,0.5)'
               : focused
-              ? 'var(--primary)'
-              : 'var(--border)',
+              ? 'rgba(160,120,80,0.6)'
+              : 'rgba(160,120,80,0.24)',
+            boxShadow: focused
+              ? '0 0 0 3px rgba(160,120,80,0.1)'
+              : error
+              ? '0 0 0 3px rgba(184,74,74,0.08)'
+              : 'none',
+            background: focused ? '#fff' : 'rgba(255,252,248,0.9)',
             paddingLeft: prefix ? '36px' : '14px',
             paddingRight: suffix ? '36px' : '14px',
             ...style,
@@ -76,64 +75,51 @@ export const Input = ({
           {...rest}
         />
         {suffix && (
-          <span
-            style={{
-              position: 'absolute',
-              right: '12px',
-              color: 'var(--text-muted)',
-              fontSize: '14px',
-              pointerEvents: 'none',
-            }}
-          >
+          <span style={{
+            position: 'absolute', right: '12px',
+            color: '#c4a882', fontSize: '13px', pointerEvents: 'none',
+          }}>
             {suffix}
           </span>
         )}
       </div>
-      {error && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#f87171' }}>{error}</p>
-      )}
-      {hint && !error && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>{hint}</p>
-      )}
+      {error && <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#b84a4a', fontFamily: "'Outfit', sans-serif" }}>{error}</p>}
+      {hint && !error && <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>{hint}</p>}
     </div>
   );
 };
 
 export const Select = ({
-  label,
-  error,
-  hint,
-  children,
-  className = '',
-  style = {},
-  containerStyle = {},
-  required,
-  ...rest
+  label, error, hint, children,
+  className = '', style = {}, containerStyle = {}, required, ...rest
 }) => {
   const [focused, setFocused] = useState(false);
 
   return (
     <div className={`form-group ${className}`} style={{ marginBottom: '16px', ...containerStyle }}>
       {label && (
-        <label
-          style={{
-            display: 'block',
-            marginBottom: '6px',
-            fontSize: '13px',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-          }}
-        >
+        <label style={{
+          display: 'block', marginBottom: '6px',
+          fontSize: '10.5px', fontWeight: 700,
+          color: '#7a5c44', textTransform: 'uppercase',
+          letterSpacing: '0.7px', fontFamily: "'Outfit', sans-serif",
+        }}>
           {label}
-          {required && <span style={{ color: '#f87171', marginLeft: '3px' }}>*</span>}
+          {required && <span style={{ color: '#b84a4a', marginLeft: '3px' }}>*</span>}
         </label>
       )}
       <select
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
-          ...baseInputStyle,
-          borderColor: error ? '#f87171' : focused ? 'var(--primary)' : 'var(--border)',
+          ...baseStyle,
+          borderColor: error
+            ? 'rgba(184,74,74,0.5)'
+            : focused
+            ? 'rgba(160,120,80,0.6)'
+            : 'rgba(160,120,80,0.24)',
+          boxShadow: focused ? '0 0 0 3px rgba(160,120,80,0.1)' : 'none',
+          background: focused ? '#fff' : 'rgba(255,252,248,0.9)',
           cursor: 'pointer',
           ...style,
         }}
@@ -141,43 +127,29 @@ export const Select = ({
       >
         {children}
       </select>
-      {error && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#f87171' }}>{error}</p>
-      )}
-      {hint && !error && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>{hint}</p>
-      )}
+      {error && <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#b84a4a', fontFamily: "'Outfit', sans-serif" }}>{error}</p>}
+      {hint && !error && <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>{hint}</p>}
     </div>
   );
 };
 
 export const Textarea = ({
-  label,
-  error,
-  hint,
-  rows = 4,
-  className = '',
-  style = {},
-  containerStyle = {},
-  required,
-  ...rest
+  label, error, hint, rows = 4,
+  className = '', style = {}, containerStyle = {}, required, ...rest
 }) => {
   const [focused, setFocused] = useState(false);
 
   return (
     <div className={`form-group ${className}`} style={{ marginBottom: '16px', ...containerStyle }}>
       {label && (
-        <label
-          style={{
-            display: 'block',
-            marginBottom: '6px',
-            fontSize: '13px',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-          }}
-        >
+        <label style={{
+          display: 'block', marginBottom: '6px',
+          fontSize: '10.5px', fontWeight: 700,
+          color: '#7a5c44', textTransform: 'uppercase',
+          letterSpacing: '0.7px', fontFamily: "'Outfit', sans-serif",
+        }}>
           {label}
-          {required && <span style={{ color: '#f87171', marginLeft: '3px' }}>*</span>}
+          {required && <span style={{ color: '#b84a4a', marginLeft: '3px' }}>*</span>}
         </label>
       )}
       <textarea
@@ -185,20 +157,22 @@ export const Textarea = ({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
-          ...baseInputStyle,
+          ...baseStyle,
           resize: 'vertical',
-          minHeight: `${rows * 24}px`,
-          borderColor: error ? '#f87171' : focused ? 'var(--primary)' : 'var(--border)',
+          minHeight: `${rows * 26}px`,
+          borderColor: error
+            ? 'rgba(184,74,74,0.5)'
+            : focused
+            ? 'rgba(160,120,80,0.6)'
+            : 'rgba(160,120,80,0.24)',
+          boxShadow: focused ? '0 0 0 3px rgba(160,120,80,0.1)' : 'none',
+          background: focused ? '#fff' : 'rgba(255,252,248,0.9)',
           ...style,
         }}
         {...rest}
       />
-      {error && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#f87171' }}>{error}</p>
-      )}
-      {hint && !error && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>{hint}</p>
-      )}
+      {error && <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#b84a4a', fontFamily: "'Outfit', sans-serif" }}>{error}</p>}
+      {hint && !error && <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>{hint}</p>}
     </div>
   );
 };

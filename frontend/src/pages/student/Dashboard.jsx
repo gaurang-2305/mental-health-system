@@ -9,142 +9,371 @@ export default function Dashboard() {
   const [data, setData] = useState({ moods: [], stress: [], goals: [], recommendations: [], loading: true });
 
   useEffect(() => {
-  if (!profile?.id) return;
-  Promise.all([
-    getMoodLogs(profile.id, 7),      // was getMoodHistory
-    getStressScores(profile.id, 1),
-    getGoals(profile.id),
-  ]).then(([moods, stress, goals]) => {
-    setData({ moods, stress, goals, recommendations: [], loading: false });
-  }).catch(() => setData(d => ({ ...d, loading: false })));
-}, [profile?.id]);
+    if (!profile?.id) return;
+    Promise.all([
+      getMoodLogs(profile.id, 7),
+      getStressScores(profile.id, 1),
+      getGoals(profile.id),
+    ]).then(([moods, stress, goals]) => {
+      setData({ moods, stress, goals, recommendations: [], loading: false });
+    }).catch(() => setData(d => ({ ...d, loading: false })));
+  }, [profile?.id]);
 
-  if (data.loading) return <Loader text="Loading your dashboard..." />;
+  if (data.loading) return <Loader text="Loading your dashboard…" />;
 
-  const latestMood = data.moods[0];
+  const latestMood   = data.moods[0];
   const latestStress = data.stress[0];
-  const avgMood = data.moods.length ? (data.moods.reduce((a, m) => a + m.mood_score, 0) / data.moods.length).toFixed(1) : '—';
+  const avgMood = data.moods.length
+    ? (data.moods.reduce((a, m) => a + m.mood_score, 0) / data.moods.length).toFixed(1)
+    : '—';
   const pendingGoals = data.goals.filter(g => !g.is_completed).length;
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const moodEmoji = score => score >= 8 ? '😄' : score >= 6 ? '🙂' : score >= 4 ? '😐' : '😔';
-  const riskColor = r => ({ low: 'var(--success)', moderate: 'var(--warning)', high: 'var(--danger)', critical: 'var(--danger)' }[r] || 'var(--text3)');
+  const moodEmoji = score => score >= 8 ? '✦' : score >= 6 ? '◎' : score >= 4 ? '◐' : '◑';
+  const moodColor = score => score >= 8 ? '#5a8a65' : score >= 6 ? '#a07850' : score >= 4 ? '#b88c18' : '#b84a4a';
+  const riskColor = r => ({ low: '#5a8a65', moderate: '#b88c18', high: '#c06420', critical: '#b84a4a' }[r] || '#a8896e');
+
+  const quickActions = [
+    { to: '/student/mood',         label: 'Log Mood',         icon: '◎', color: '#a07850' },
+    { to: '/student/survey',       label: 'Daily Survey',     icon: '✦', color: '#5a8a65' },
+    { to: '/student/chatbot',      label: 'Chat with AI',     icon: '◈', color: '#4a7a9b' },
+    { to: '/student/appointments', label: 'Book Session',     icon: '◻', color: '#b88c18' },
+  ];
 
   return (
-    <div className="animate-fade">
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem' }}>
-          {greeting}, {profile?.full_name?.split(' ')[0]} 👋
-        </h1>
-        <p style={{ color: 'var(--text2)', marginTop: 4 }}>Here's your mental wellness overview for today.</p>
+    <div className="animate-fade" style={{ padding: '32px 36px', maxWidth: 1280 }}>
+
+      {/* ─── Header ─── */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <p style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '2px',
+              color: '#c4a882', textTransform: 'uppercase',
+              marginBottom: 6, fontFamily: "'Outfit', sans-serif",
+            }}>
+              {greeting}
+            </p>
+            <h1 style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontSize: '2.4rem', fontWeight: 600,
+              color: '#2c1f12', marginBottom: 6, letterSpacing: '0.01em',
+            }}>
+              {profile?.full_name?.split(' ')[0] || 'Welcome'} ✦
+            </h1>
+            <p style={{ color: '#a8896e', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>
+              Here's your mental wellness overview for today.
+            </p>
+          </div>
+          <div style={{
+            background: 'rgba(255,252,248,0.8)',
+            border: '1px solid rgba(160,120,80,0.18)',
+            borderRadius: 14, padding: '12px 18px',
+            backdropFilter: 'blur(8px)',
+          }}>
+            <div style={{ fontSize: 10, color: '#c4a882', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Today</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', color: '#2c1f12' }}>
+              {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
+          {quickActions.map(a => (
+            <Link key={a.to} to={a.to} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 18px',
+              borderRadius: 30,
+              background: 'rgba(255,252,248,0.85)',
+              border: `1px solid ${a.color}30`,
+              color: a.color,
+              fontSize: 12.5,
+              fontWeight: 600,
+              textDecoration: 'none',
+              transition: 'all 0.18s',
+              fontFamily: "'Outfit', sans-serif",
+              backdropFilter: 'blur(8px)',
+              boxShadow: `0 2px 8px ${a.color}15`,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = `${a.color}12`;
+              e.currentTarget.style.borderColor = `${a.color}55`;
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(255,252,248,0.85)';
+              e.currentTarget.style.borderColor = `${a.color}30`;
+              e.currentTarget.style.transform = 'none';
+            }}
+            >
+              <span style={{ fontFamily: 'system-ui', fontSize: 13 }}>{a.icon}</span>
+              {a.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
-      {/* Quick actions */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap' }}>
+      {/* ─── Stat Cards ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
-          { to: '/student/mood', label: '+ Log Mood', color: 'var(--primary)' },
-          { to: '/student/survey', label: '📋 Take Survey', color: 'var(--success)' },
-          { to: '/student/chatbot', label: '💬 Chat with AI', color: '#a78bfa' },
-          { to: '/student/appointments', label: '📅 Book Appointment', color: 'var(--warning)' },
-        ].map(a => (
-          <Link key={a.to} to={a.to} style={{ padding: '8px 16px', borderRadius: 8, background: `${a.color}15`, border: `1px solid ${a.color}40`, color: a.color, fontSize: 13, fontWeight: 500, textDecoration: 'none', transition: 'all 0.15s' }}
-            onMouseEnter={e => e.currentTarget.style.background = `${a.color}25`}
-            onMouseLeave={e => e.currentTarget.style.background = `${a.color}15`}>
-            {a.label}
-          </Link>
+          {
+            label: 'Current Mood',
+            value: latestMood ? `${latestMood.mood_score}/10` : 'Not logged',
+            icon: latestMood ? moodEmoji(latestMood.mood_score) : '◎',
+            sub: latestMood ? 'Today' : 'Log your mood',
+            color: latestMood ? moodColor(latestMood.mood_score) : '#a8896e',
+          },
+          {
+            label: '7-Day Avg Mood',
+            value: avgMood !== '—' ? `${avgMood}/10` : '—',
+            icon: '◈',
+            sub: 'Last 7 days',
+            color: '#4a7a9b',
+          },
+          {
+            label: 'Stress Level',
+            value: latestStress ? `${Math.round(latestStress.score)}%` : '—',
+            icon: '◉',
+            sub: <span style={{ color: latestStress ? riskColor(latestStress.risk_level) : 'inherit' }}>
+              {latestStress?.risk_level || 'Not measured'}
+            </span>,
+            color: '#b88c18',
+          },
+          {
+            label: 'Active Goals',
+            value: pendingGoals,
+            icon: '◇',
+            sub: `${data.goals.filter(g => g.is_completed).length} completed`,
+            color: '#5a8a65',
+          },
+        ].map(s => (
+          <div key={s.label} style={{
+            background: 'rgba(255,252,248,0.9)',
+            border: '1px solid rgba(160,120,80,0.16)',
+            borderRadius: 16, padding: '20px 22px',
+            boxShadow: '0 2px 12px rgba(80,50,20,0.07)',
+            transition: 'box-shadow 0.2s, transform 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 24px rgba(80,50,20,0.13)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 12px rgba(80,50,20,0.07)'; e.currentTarget.style.transform = 'none'; }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 11, color: '#a8896e', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: "'Outfit', sans-serif" }}>
+                {s.label}
+              </span>
+              <div style={{
+                width: 34, height: 34, borderRadius: 9,
+                background: `${s.color}14`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 15, color: s.color,
+              }}>
+                {s.icon}
+              </div>
+            </div>
+            <div style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontSize: '2rem', fontWeight: 600,
+              color: s.color, lineHeight: 1, marginBottom: 5,
+            }}>
+              {s.value}
+            </div>
+            <div style={{ fontSize: 11.5, color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>{s.sub}</div>
+          </div>
         ))}
       </div>
 
-      {/* Stats */}
-      <div className="grid-4" style={{ marginBottom: 24 }}>
-        <StatCard icon={latestMood ? moodEmoji(latestMood.mood_score) : '😶'} label="Current Mood" value={latestMood ? `${latestMood.mood_score}/10` : 'Not logged'} sub={latestMood ? 'Today' : 'Log your mood'} color="var(--primary)" />
-        <StatCard icon="📊" label="7-Day Avg Mood" value={avgMood !== '—' ? `${avgMood}/10` : '—'} sub="Last 7 days" color="var(--info)" />
-        <StatCard icon="😓" label="Stress Level" value={latestStress ? `${Math.round(latestStress.score)}%` : '—'} sub={<span style={{ color: latestStress ? riskColor(latestStress.risk_level) : 'inherit' }}>{latestStress?.risk_level || 'Not measured'}</span>} color="var(--warning)" />
-        <StatCard icon="🎯" label="Active Goals" value={pendingGoals} sub={`${data.goals.filter(g => g.is_completed).length} completed`} color="var(--success)" />
-      </div>
-
+      {/* ─── Content Grid ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Mood trend */}
-        <Card title="Recent Mood Trend">
+
+        {/* Mood Trend */}
+        <div style={{
+          background: 'rgba(255,252,248,0.9)',
+          border: '1px solid rgba(160,120,80,0.14)',
+          borderRadius: 16, padding: '22px 24px',
+          boxShadow: '0 2px 12px rgba(80,50,20,0.06)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', color: '#2c1f12', fontWeight: 500 }}>
+                Mood Trend
+              </div>
+              <div style={{ fontSize: 11, color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>Last 7 days</div>
+            </div>
+            <Link to="/student/mood" style={{ fontSize: 11.5, color: '#a07850', fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
+              Track mood →
+            </Link>
+          </div>
+
           {data.moods.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text3)' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>😊</div>
-              <p style={{ fontSize: 13 }}>No mood logs yet. <Link to="/student/mood">Start tracking!</Link></p>
+            <div style={{ textAlign: 'center', padding: '24px 0', color: '#c4a882' }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2.4rem', marginBottom: 8 }}>◎</div>
+              <p style={{ fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                No mood logs yet.{' '}
+                <Link to="/student/mood" style={{ color: '#a07850', fontWeight: 600 }}>Start tracking!</Link>
+              </p>
             </div>
           ) : (
             <div>
               {data.moods.slice(0, 7).reverse().map((m, i) => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 18 }}>{moodEmoji(m.mood_score)}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${m.mood_score * 10}%`, background: m.mood_score >= 7 ? 'var(--success)' : m.mood_score >= 4 ? 'var(--warning)' : 'var(--danger)', borderRadius: 4, transition: 'width 0.5s ease' }} />
-                    </div>
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 9 }}>
+                  <span style={{ fontSize: 11, color: '#c4a882', width: 28, flexShrink: 0, fontFamily: "'Outfit', sans-serif" }}>
+                    {new Date(m.logged_at).toLocaleDateString('en', { weekday: 'short' })}
+                  </span>
+                  <div style={{ flex: 1, height: 7, background: 'rgba(160,120,80,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${m.mood_score * 10}%`,
+                      background: m.mood_score >= 7 ? '#5a8a65' : m.mood_score >= 4 ? '#a07850' : '#b84a4a',
+                      borderRadius: 4,
+                      transition: 'width 0.5s ease',
+                    }} />
                   </div>
-                  <span style={{ fontSize: 12, color: 'var(--text3)', width: 28, textAlign: 'right' }}>{m.mood_score}/10</span>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', width: 32 }}>{new Date(m.logged_at).toLocaleDateString('en', { weekday: 'short' })}</span>
+                  <span style={{ fontSize: 11.5, color: '#a8896e', width: 30, textAlign: 'right', fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
+                    {m.mood_score}
+                  </span>
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </div>
 
         {/* AI Recommendations */}
-        <Card title="AI Recommendations" action={<Link to="/student/recommendations" style={{ fontSize: 12, color: 'var(--primary)' }}>View all</Link>}>
-          {data.recommendations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text3)', fontSize: 13 }}>
-              Complete a survey to get AI recommendations
+        <div style={{
+          background: 'rgba(255,252,248,0.9)',
+          border: '1px solid rgba(160,120,80,0.14)',
+          borderRadius: 16, padding: '22px 24px',
+          boxShadow: '0 2px 12px rgba(80,50,20,0.06)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', color: '#2c1f12', fontWeight: 500 }}>
+                AI Recommendations
+              </div>
+              <div style={{ fontSize: 11, color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>Personalised for you</div>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {data.recommendations.slice(0, 3).map(r => (
-                <div key={r.id} style={{ padding: '10px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: '3px solid var(--primary)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>{r.category}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text2)' }}>{r.content}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+            <Link to="/student/recommendations" style={{ fontSize: 11.5, color: '#a07850', fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
+              View all →
+            </Link>
+          </div>
+          <div style={{ textAlign: 'center', padding: '24px 0', color: '#c4a882' }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2.4rem', marginBottom: 8 }}>✧</div>
+            <p style={{ fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+              Complete a survey to get AI-powered recommendations.
+            </p>
+            <Link to="/student/survey" style={{
+              display: 'inline-block', marginTop: 12,
+              padding: '8px 18px', borderRadius: 20,
+              background: 'rgba(160,120,80,0.1)',
+              border: '1px solid rgba(160,120,80,0.25)',
+              color: '#a07850', fontSize: 12.5,
+              fontWeight: 600, fontFamily: "'Outfit', sans-serif",
+              textDecoration: 'none',
+            }}>
+              Take Survey →
+            </Link>
+          </div>
+        </div>
 
         {/* Goals */}
-        <Card title="Your Goals" action={<Link to="/student/goals" style={{ fontSize: 12, color: 'var(--primary)' }}>Manage</Link>}>
+        <div style={{
+          background: 'rgba(255,252,248,0.9)',
+          border: '1px solid rgba(160,120,80,0.14)',
+          borderRadius: 16, padding: '22px 24px',
+          boxShadow: '0 2px 12px rgba(80,50,20,0.06)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', color: '#2c1f12', fontWeight: 500 }}>
+                Your Goals
+              </div>
+              <div style={{ fontSize: 11, color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>{pendingGoals} active</div>
+            </div>
+            <Link to="/student/goals" style={{ fontSize: 11.5, color: '#a07850', fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
+              Manage →
+            </Link>
+          </div>
           {data.goals.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text3)', fontSize: 13 }}>
-              <Link to="/student/goals">Set your first wellness goal →</Link>
+            <div style={{ textAlign: 'center', padding: '16px 0', color: '#c4a882', fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+              <Link to="/student/goals" style={{ color: '#a07850', fontWeight: 600 }}>Set your first wellness goal →</Link>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
               {data.goals.slice(0, 4).map(g => (
-                <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: 16 }}>{g.is_completed ? '✅' : '⭕'}</span>
-                  <span style={{ flex: 1, fontSize: 13, color: g.is_completed ? 'var(--text3)' : 'var(--text)', textDecoration: g.is_completed ? 'line-through' : 'none' }}>{g.title}</span>
-                  {g.target_date && <span style={{ fontSize: 11, color: 'var(--text3)' }}>{new Date(g.target_date).toLocaleDateString()}</span>}
+                <div key={g.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '9px 0', borderBottom: '1px solid rgba(160,120,80,0.1)',
+                }}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: g.is_completed ? '#5a8a6520' : 'transparent',
+                    border: `1.5px solid ${g.is_completed ? '#5a8a65' : 'rgba(160,120,80,0.35)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, color: '#5a8a65', flexShrink: 0,
+                  }}>
+                    {g.is_completed ? '✓' : ''}
+                  </div>
+                  <span style={{
+                    flex: 1, fontSize: 13.5,
+                    color: g.is_completed ? '#c4a882' : '#2c1f12',
+                    textDecoration: g.is_completed ? 'line-through' : 'none',
+                    fontFamily: "'Outfit', sans-serif",
+                  }}>
+                    {g.title}
+                  </span>
+                  {g.target_date && (
+                    <span style={{ fontSize: 11, color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>
+                      {new Date(g.target_date).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Quick resources */}
-        <Card title="Quick Resources">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Quick Resources */}
+        <div style={{
+          background: 'rgba(255,252,248,0.9)',
+          border: '1px solid rgba(160,120,80,0.14)',
+          borderRadius: 16, padding: '22px 24px',
+          boxShadow: '0 2px 12px rgba(80,50,20,0.06)',
+        }}>
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', color: '#2c1f12', fontWeight: 500 }}>
+              Quick Resources
+            </div>
+            <div style={{ fontSize: 11, color: '#c4a882', fontFamily: "'Outfit', sans-serif" }}>Jump right in</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {[
-              { icon: '🧘', label: 'Breathing exercises', to: '/student/stress-relief' },
-              { icon: '📔', label: 'Write in journal', to: '/student/journal' },
-              { icon: '👥', label: 'Peer support forum', to: '/student/forum' },
-              { icon: '📅', label: 'Book a counselor session', to: '/student/appointments' },
+              { icon: '◎', label: 'Breathing exercises',    to: '/student/stress-relief', color: '#5a8a65' },
+              { icon: '❋', label: 'Write in journal',       to: '/student/journal',       color: '#a07850' },
+              { icon: '◯', label: 'Peer support forum',    to: '/student/forum',         color: '#4a7a9b' },
+              { icon: '◻', label: 'Book a counselor session', to: '/student/appointments', color: '#b88c18' },
             ].map(r => (
-              <Link key={r.to} to={r.to} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: 'var(--bg3)', color: 'var(--text)', textDecoration: 'none', fontSize: 13, transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--bg3)'}>
-                <span>{r.icon}</span><span>{r.label}</span><span style={{ marginLeft: 'auto', color: 'var(--text3)' }}>→</span>
+              <Link key={r.to} to={r.to} style={{
+                display: 'flex', alignItems: 'center', gap: 11,
+                padding: '10px 14px', borderRadius: 10,
+                background: `${r.color}08`,
+                border: `1px solid ${r.color}18`,
+                color: '#2c1f12', textDecoration: 'none',
+                fontSize: 13.5, transition: 'all 0.16s',
+                fontFamily: "'Outfit', sans-serif",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${r.color}14`; e.currentTarget.style.borderColor = `${r.color}35`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = `${r.color}08`; e.currentTarget.style.borderColor = `${r.color}18`; }}
+              >
+                <span style={{ color: r.color, fontSize: 14, fontFamily: 'system-ui' }}>{r.icon}</span>
+                <span>{r.label}</span>
+                <span style={{ marginLeft: 'auto', color: '#c4a882', fontSize: 12 }}>→</span>
               </Link>
             ))}
           </div>
-        </Card>
+        </div>
+
       </div>
     </div>
   );
