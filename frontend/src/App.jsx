@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { LanguageProvider } from './context/LanguageContext';
 
+// ─── Home page ────────────────────────────────────────────────────────────────
+import HomePage from './pages/HomePage';
+
 // ─── Auth pages ───────────────────────────────────────────────────────────────
 import Login      from './pages/auth/Login';
 import Register   from './pages/auth/Register';
@@ -69,7 +72,7 @@ function AuthLoader() {
   );
 }
 
-// ─── App layout with sidebar ─────────────────────────────────────────────────
+// ─── App layout with sidebar ──────────────────────────────────────────────────
 function AppLayout({ children }) {
   const [collapsed, setCollapsed] = React.useState(false);
   return (
@@ -82,6 +85,15 @@ function AppLayout({ children }) {
   );
 }
 
+// ─── Home or redirect ─────────────────────────────────────────────────────────
+// If logged in → go to dashboard. If not → show homepage.
+function HomeOrRedirect() {
+  const { user, role, loading } = useAuth();
+  if (loading) return <AuthLoader />;
+  if (user) return <Navigate to={`/${role}`} replace />;
+  return <HomePage />;
+}
+
 // ─── Route guards ─────────────────────────────────────────────────────────────
 function RequireAuth({ children, allowedRoles }) {
   const { user, role, loading } = useAuth();
@@ -89,13 +101,6 @@ function RequireAuth({ children, allowedRoles }) {
   if (!user)   return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(role)) return <Navigate to={`/${role}`} replace />;
   return <AppLayout>{children}</AppLayout>;
-}
-
-function RoleRedirect() {
-  const { user, role, loading } = useAuth();
-  if (loading) return <AuthLoader />;
-  if (!user)   return <Navigate to="/login" replace />;
-  return <Navigate to={`/${role}`} replace />;
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -106,11 +111,13 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              {/* ── Public ── */}
+              {/* ── Home (public) ── */}
+              <Route path="/" element={<HomeOrRedirect />} />
+
+              {/* ── Auth (public) ── */}
               <Route path="/login"       element={<Login />} />
               <Route path="/register"    element={<Register />} />
               <Route path="/admin-login" element={<AdminLogin />} />
-              <Route path="/"            element={<RoleRedirect />} />
 
               {/* ── Student ── */}
               <Route path="/student"                 element={<RequireAuth allowedRoles={['student']}><Dashboard /></RequireAuth>} />
