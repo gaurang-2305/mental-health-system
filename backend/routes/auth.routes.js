@@ -30,6 +30,7 @@ router.post('/login',
 );
 
 // POST /api/auth/logout
+
 router.post('/logout', auth, ctrl.logout);
 
 // POST /api/auth/refresh

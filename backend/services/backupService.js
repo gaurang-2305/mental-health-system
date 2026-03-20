@@ -1,17 +1,9 @@
-// Module 27
-export async function createBackup() {
-  // Create system backup
-  return { success: true };
-}
-
-export async function restoreBackup(backupId) {
-  // Restore from backup
-  return { success: true };
-}
+// backend/services/backupService.js
+// FIX: Removed stray ES module export lines that caused SyntaxError on startup
 const cron   = require('node-cron');
 const path   = require('path');
 const fs     = require('fs');
-const { toJSON, toXLSX } = require('./exportService');
+const { toJSON, toXLSX }      = require('./exportService');
 const { generateAllReports }  = require('./reportService');
 const { sendSurveyReminders } = require('./notificationService');
 const logger = require('../utils/index');
@@ -21,9 +13,6 @@ if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 // ─── Backup helpers ───────────────────────────────────────────────────────────
 
-/**
- * Write a full JSON backup to disk and return the filepath.
- */
 async function runJSONBackup() {
   try {
     const buf      = await toJSON();
@@ -31,10 +20,7 @@ async function runJSONBackup() {
     const filepath = path.join(BACKUP_DIR, filename);
     fs.writeFileSync(filepath, buf);
     logger.info(`JSON backup saved: ${filename} (${(buf.length / 1024).toFixed(1)} KB)`);
-
-    // Keep only the 7 most recent backups
     pruneBackups('.json', 7);
-
     return filepath;
   } catch (err) {
     logger.error(`JSON backup failed: ${err.message}`);
@@ -42,9 +28,6 @@ async function runJSONBackup() {
   }
 }
 
-/**
- * Write a full XLSX backup to disk.
- */
 async function runXLSXBackup() {
   try {
     const buf      = await toXLSX();
@@ -52,9 +35,7 @@ async function runXLSXBackup() {
     const filepath = path.join(BACKUP_DIR, filename);
     fs.writeFileSync(filepath, buf);
     logger.info(`XLSX backup saved: ${filename} (${(buf.length / 1024).toFixed(1)} KB)`);
-
     pruneBackups('.xlsx', 3);
-
     return filepath;
   } catch (err) {
     logger.error(`XLSX backup failed: ${err.message}`);
@@ -62,16 +43,12 @@ async function runXLSXBackup() {
   }
 }
 
-/**
- * Remove old backup files, keeping only the `keep` most recent.
- */
 function pruneBackups(ext, keep = 7) {
   try {
     const files = fs.readdirSync(BACKUP_DIR)
       .filter(f => f.endsWith(ext))
       .map(f => ({ name: f, time: fs.statSync(path.join(BACKUP_DIR, f)).mtime.getTime() }))
       .sort((a, b) => b.time - a.time);
-
     files.slice(keep).forEach(f => {
       fs.unlinkSync(path.join(BACKUP_DIR, f.name));
       logger.info(`Pruned old backup: ${f.name}`);
@@ -81,9 +58,6 @@ function pruneBackups(ext, keep = 7) {
   }
 }
 
-/**
- * List available backup files.
- */
 function listBackups() {
   try {
     return fs.readdirSync(BACKUP_DIR)
@@ -103,7 +77,7 @@ function listBackups() {
 function startCronJobs() {
   if (process.env.NODE_ENV === 'test') return;
 
-  // Daily backup at 2:00 AM
+  // Daily JSON backup at 2:00 AM
   cron.schedule('0 2 * * *', async () => {
     logger.info('Cron: daily backup starting');
     await runJSONBackup().catch(err => logger.error(`Cron backup error: ${err.message}`));

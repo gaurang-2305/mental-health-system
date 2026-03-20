@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getMoodHistory, getStressScores, getGoals, getRecommendations, getNotifications } from '../../services/dataService';
+import { getMoodLogs, getStressScores, getGoals } from '../../services/dataService';
 import { StatCard, Card, Badge, Loader } from '../../components/ui/index.jsx';
 
 export default function Dashboard() {
@@ -9,16 +9,15 @@ export default function Dashboard() {
   const [data, setData] = useState({ moods: [], stress: [], goals: [], recommendations: [], loading: true });
 
   useEffect(() => {
-    if (!profile?.id) return;
-    Promise.all([
-      getMoodHistory(profile.id, 7),
-      getStressScores(profile.id, 1),
-      getGoals(profile.id),
-      getRecommendations(profile.id),
-    ]).then(([moods, stress, goals, recs]) => {
-      setData({ moods, stress, goals, recommendations: recs, loading: false });
-    }).catch(() => setData(d => ({ ...d, loading: false })));
-  }, [profile?.id]);
+  if (!profile?.id) return;
+  Promise.all([
+    getMoodLogs(profile.id, 7),      // was getMoodHistory
+    getStressScores(profile.id, 1),
+    getGoals(profile.id),
+  ]).then(([moods, stress, goals]) => {
+    setData({ moods, stress, goals, recommendations: [], loading: false });
+  }).catch(() => setData(d => ({ ...d, loading: false })));
+}, [profile?.id]);
 
   if (data.loading) return <Loader text="Loading your dashboard..." />;
 

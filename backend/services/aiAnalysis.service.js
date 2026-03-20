@@ -1,42 +1,20 @@
+// backend/services/aiAnalysisService.js
+// FIX: generateFromLatestData → generateAndSave (correct export from recommendationService)
 const supabase  = require('../config/supabase');
 const grok      = require('./grokService');
 const { evaluateRisk } = require('./crisisService');
 const logger    = require('../utils/index');
 
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * aiAnalysisService.js
- *
- * Central hub for all AI-driven analysis in MindCare.
- * Each function:
- *   1. Runs the AI analysis (with fallback)
- *   2. Persists results to Supabase
- *   3. Triggers downstream effects (crisis alerts, stress scores, etc.)
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
 // ─── Survey Evaluation ────────────────────────────────────────────────────────
-
-/**
- * AI-evaluate a completed survey and compute risk.
- * Saves a stress_score and triggers a crisis alert if needed.
- *
- * @param {string} studentId
- * @param {Object} surveyData  — { mood_score, stress_score, sleep_hours, anxiety_level, responses }
- * @param {string} [studentName]
- * @returns {Promise<{ ai_evaluation, risk_level, stress_score }>}
- */
 async function evaluateSurvey(studentId, surveyData, studentName = 'Student') {
   const { mood_score, stress_score, sleep_hours, anxiety_level, responses } = surveyData;
 
-  // Compute numeric stress score (0–100)
   const numericScore = ((stress_score + anxiety_level) / 2) * 10;
   const risk_level   = numericScore >= 75 ? 'critical'
     : numericScore >= 55 ? 'high'
     : numericScore >= 35 ? 'moderate'
     : 'low';
 
-  // AI evaluation — best-effort, never blocks the response
   let ai_evaluation = null;
   try {
     ai_evaluation = await grok.evaluateSurvey({ mood_score, stress_score, sleep_hours, anxiety_level, responses });
@@ -44,37 +22,20 @@ async function evaluateSurvey(studentId, surveyData, studentName = 'Student') {
     logger.warn(`evaluateSurvey AI skipped for ${studentId}: ${err.message}`);
   }
 
-  // Persist stress score
   await supabase.from('stress_scores').insert({
     student_id: studentId,
     score:      numericScore,
     risk_level,
   });
 
-  // Raise crisis alert if high / critical
   if (['high', 'critical'].includes(risk_level)) {
-    await evaluateRisk(
-      studentId,
-      numericScore,
-      studentName,
-      'survey'
-    );
+    await evaluateRisk(studentId, numericScore, studentName, 'survey');
   }
 
   return { ai_evaluation, risk_level, stress_score: numericScore };
 }
 
 // ─── Symptom Analysis ─────────────────────────────────────────────────────────
-
-/**
- * Run AI symptom analysis and persist the result.
- * Auto-raises a crisis alert when depression or high-confidence anxiety is detected.
- *
- * @param {string}   studentId
- * @param {Object}   input  — { symptoms, duration_days, severity }
- * @param {string}   [studentName]
- * @returns {Promise<Object>}  saved symptom_analysis row
- */
 async function analyzeSymptoms(studentId, input, studentName = 'Student') {
   const { symptoms, duration_days, severity } = input;
 
@@ -96,8 +57,6 @@ async function analyzeSymptoms(studentId, input, studentName = 'Student') {
     };
   } catch (err) {
     logger.warn(`analyzeSymptoms AI failed for ${studentId}, using keyword fallback: ${err.message}`);
-
-    // Keyword fallback
     const text = Array.isArray(symptoms) ? symptoms.join(' ').toLowerCase() : String(symptoms).toLowerCase();
     anxiety_detected    = /anxious|worry|panic|nervous|fear/.test(text);
     depression_detected = /sad|hopeless|empty|numb|worthless|depress/.test(text);
@@ -106,7 +65,6 @@ async function analyzeSymptoms(studentId, input, studentName = 'Student') {
     analysis_data       = { summary: 'Keyword-based analysis (AI unavailable)', recommendations: [] };
   }
 
-  // Persist
   const { data, error } = await supabase
     .from('symptom_analysis')
     .insert({
@@ -126,7 +84,6 @@ async function analyzeSymptoms(studentId, input, studentName = 'Student') {
     throw error;
   }
 
-  // Raise alert if depression or high-confidence anxiety
   if (depression_detected || (anxiety_detected && confidence_score > 70)) {
     const riskScore = depression_detected ? 75 : 60;
     await evaluateRisk(studentId, riskScore, studentName, 'symptom_analysis');
@@ -136,14 +93,6 @@ async function analyzeSymptoms(studentId, input, studentName = 'Student') {
 }
 
 // ─── Sentiment Analysis ───────────────────────────────────────────────────────
-
-/**
- * Analyse journal entry sentiment and return { sentiment, score, analysis }.
- * Uses grokService; falls back to keyword detection.
- *
- * @param {string} text
- * @returns {Promise<{ sentiment: string, score: number, analysis: string|null }>}
- */
 async function analyzeJournalSentiment(text) {
   try {
     const result = await grok.analyzeSentiment(text);
@@ -170,7 +119,6 @@ function keywordSentimentFallback(text) {
 }
 
 // ─── Chatbot ──────────────────────────────────────────────────────────────────
-
 const CRISIS_KEYWORDS = [
   'suicide', 'kill myself', 'end my life', 'want to die', 'better off dead',
   'self-harm', 'hurt myself', 'cut myself', 'overdose', 'no reason to live',
@@ -179,42 +127,25 @@ const CRISIS_KEYWORDS = [
 const CRISIS_RESPONSE = (name) =>
   `${name}, I'm really glad you reached out. What you're feeling sounds very serious and your life matters deeply. Please contact a crisis helpline right now — iCall: 9152987821 or Vandrevala Foundation: 1860-2662-345 (24/7 free). If you're in immediate danger please call emergency services (112). I'm here, but you deserve professional support immediately.`;
 
-/**
- * Generate a chatbot reply for a student message.
- * Detects crisis keywords and short-circuits to a crisis response if found.
- * Also persists both the user message and AI reply to chat_messages.
- *
- * @param {string}   studentId
- * @param {string}   message
- * @param {string}   studentName
- * @param {Array}    history        — recent chat history [{role, message}]
- * @returns {Promise<{ reply: string, is_crisis: boolean }>}
- */
 async function processChatMessage(studentId, message, studentName = 'there', history = []) {
-  // Save user message
   await supabase.from('chat_messages').insert({
     student_id: studentId,
     role:       'user',
     message,
   });
 
-  // Crisis detection
   const lowerMsg = message.toLowerCase();
   const isCrisis = CRISIS_KEYWORDS.some(kw => lowerMsg.includes(kw));
   let reply;
 
   if (isCrisis) {
     reply = CRISIS_RESPONSE(studentName);
-
-    // Raise critical alert
     await evaluateRisk(studentId, 80, studentName, 'chatbot_crisis_keyword');
   } else {
-    // Build message array for Grok (last 10 turns)
     const messages = [
       ...history.slice(-10).map(m => ({ role: m.role, content: m.message || m.content })),
       { role: 'user', content: message },
     ];
-
     try {
       reply = await grok.chatbotReply(messages, studentName);
     } catch (err) {
@@ -223,7 +154,6 @@ async function processChatMessage(studentId, message, studentName = 'there', his
     }
   }
 
-  // Save AI reply
   await supabase.from('chat_messages').insert({
     student_id: studentId,
     role:       'assistant',
@@ -234,33 +164,16 @@ async function processChatMessage(studentId, message, studentName = 'there', his
 }
 
 // ─── Recommendation Generation ────────────────────────────────────────────────
-
-/**
- * Generate and persist AI recommendations from a student's latest data.
- * Convenience wrapper — delegates to recommendationService.
- *
- * @param {string} studentId
- */
 async function generateRecommendations(studentId) {
-  // Dynamic require to avoid circular dependency
-  const { generateFromLatestData } = require('./recommendationService');
-  return generateFromLatestData(studentId);
+  // FIX: was 'generateFromLatestData' — correct export is 'generateAndSave'
+  const { generateAndSave } = require('./recommendationService');
+  return generateAndSave(studentId);
 }
 
-// ─── Full AI Health Check (runs all analyses for a student at once) ───────────
-
-/**
- * Run a comprehensive AI health check for a student.
- * Useful for the counselor "Student Overview" page or scheduled jobs.
- *
- * @param {string} studentId
- * @param {string} [studentName]
- * @returns {Promise<Object>}
- */
+// ─── Full AI Health Check ─────────────────────────────────────────────────────
 async function runFullHealthCheck(studentId, studentName = 'Student') {
   const results = { studentId, timestamp: new Date().toISOString() };
 
-  // Latest survey evaluation
   try {
     const { data: latestSurvey } = await supabase
       .from('surveys')
@@ -269,7 +182,6 @@ async function runFullHealthCheck(studentId, studentName = 'Student') {
       .order('submitted_at', { ascending: false })
       .limit(1)
       .single();
-
     if (latestSurvey) {
       results.surveyEvaluation = await evaluateSurvey(studentId, latestSurvey, studentName);
     }
@@ -277,7 +189,6 @@ async function runFullHealthCheck(studentId, studentName = 'Student') {
     logger.warn(`runFullHealthCheck survey step failed: ${err.message}`);
   }
 
-  // Latest journal sentiment
   try {
     const { data: latestJournal } = await supabase
       .from('journal_entries')
@@ -286,7 +197,6 @@ async function runFullHealthCheck(studentId, studentName = 'Student') {
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
-
     if (latestJournal) {
       results.journalSentiment = await analyzeJournalSentiment(latestJournal.content);
     }
@@ -294,7 +204,6 @@ async function runFullHealthCheck(studentId, studentName = 'Student') {
     logger.warn(`runFullHealthCheck journal step failed: ${err.message}`);
   }
 
-  // Fresh recommendations
   try {
     results.recommendations = await generateRecommendations(studentId);
   } catch (err) {
