@@ -11,8 +11,8 @@ function deriveRoleFromProfile(p) {
 }
 
 export default function Login() {
-  const [form, setForm]     = useState({ email: '', password: '' });
-  const [error, setError]   = useState('');
+  const [form, setForm]       = useState({ email: '', password: '' });
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
   const [visible, setVisible] = useState(false);
   const navigate = useNavigate();
@@ -56,12 +56,8 @@ export default function Login() {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(150deg, #f7f0e6 0%, #ede5d8 50%, #f2ece0 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      position: 'relative',
-      overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 24, position: 'relative', overflow: 'hidden',
       fontFamily: "'Outfit', sans-serif",
     }}>
 
@@ -73,10 +69,7 @@ export default function Login() {
       </div>
 
       <div style={{
-        width: '100%',
-        maxWidth: 440,
-        position: 'relative',
-        zIndex: 1,
+        width: '100%', maxWidth: 440, position: 'relative', zIndex: 1,
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(18px)',
         transition: 'opacity 0.5s ease, transform 0.5s ease',
@@ -95,25 +88,40 @@ export default function Login() {
           }}>✦</div>
           <h1 style={{
             fontFamily: "'Cormorant Garamond', serif",
-            fontSize: '2.2rem',
-            fontWeight: 600,
-            color: '#2c1f12',
-            marginBottom: 6,
-            letterSpacing: '0.02em',
-          }}>
-            MindCare
-          </h1>
+            fontSize: '2.2rem', fontWeight: 600,
+            color: '#2c1f12', marginBottom: 6, letterSpacing: '0.02em',
+          }}>MindCare</h1>
           <p style={{ color: '#a8896e', fontSize: 13.5, fontFamily: "'Outfit', sans-serif" }}>
-            Your mental wellness companion
+            Students & counselors sign in here
           </p>
+        </div>
+
+        {/* Role hint pills */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
+          {[
+            { label: '🎓 Student', desc: 'Track your wellness' },
+            { label: '🩺 Counselor', desc: 'Manage your students' },
+          ].map(r => (
+            <div key={r.label} style={{
+              background: 'rgba(255,252,248,0.75)',
+              border: '1px solid rgba(160,120,80,0.2)',
+              borderRadius: 30, padding: '5px 14px',
+              fontSize: 12, color: '#7a5c44',
+              backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <span style={{ fontWeight: 600 }}>{r.label}</span>
+              <span style={{ color: '#c4a882' }}>·</span>
+              <span style={{ color: '#a8896e' }}>{r.desc}</span>
+            </div>
+          ))}
         </div>
 
         {/* Card */}
         <div style={{
           background: 'rgba(255,252,248,0.92)',
           border: '1px solid rgba(160,120,80,0.18)',
-          borderRadius: 20,
-          padding: '36px 40px',
+          borderRadius: 20, padding: '36px 40px',
           boxShadow: '0 8px 40px rgba(80,50,20,0.12), 0 1px 0 rgba(255,255,255,0.8) inset',
           backdropFilter: 'blur(16px)',
         }}>
@@ -136,8 +144,7 @@ export default function Login() {
             <div style={{
               background: 'rgba(184,74,74,0.08)',
               border: '1px solid rgba(184,74,74,0.28)',
-              borderRadius: 10, padding: '11px 14px',
-              marginBottom: 20,
+              borderRadius: 10, padding: '11px 14px', marginBottom: 20,
               display: 'flex', alignItems: 'center', gap: 9,
               animation: 'fadeIn 0.2s ease',
             }}>
@@ -157,9 +164,7 @@ export default function Login() {
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="you@university.edu"
-                required
-                disabled={loading}
-                autoComplete="email"
+                required disabled={loading} autoComplete="email"
                 style={{ background: '#fdf8f2', borderColor: 'rgba(160,120,80,0.25)' }}
               />
             </div>
@@ -173,9 +178,7 @@ export default function Login() {
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 placeholder="Enter your password"
-                required
-                disabled={loading}
-                autoComplete="current-password"
+                required disabled={loading} autoComplete="current-password"
                 style={{ background: '#fdf8f2', borderColor: 'rgba(160,120,80,0.25)' }}
               />
             </div>
@@ -186,15 +189,11 @@ export default function Login() {
               style={{
                 width: '100%', padding: '13px',
                 borderRadius: 12, border: 'none',
-                background: loading
-                  ? 'rgba(160,120,80,0.4)'
-                  : 'linear-gradient(135deg, #3a2a18, #6b4e30)',
+                background: loading ? 'rgba(160,120,80,0.4)' : 'linear-gradient(135deg, #3a2a18, #6b4e30)',
                 color: '#f5ede0',
                 cursor: loading || !form.email || !form.password ? 'not-allowed' : 'pointer',
                 fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 17,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
+                fontSize: 17, fontWeight: 600, letterSpacing: '0.08em',
                 boxShadow: loading ? 'none' : '0 6px 20px rgba(58,42,24,0.32)',
                 transition: 'all 0.2s',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -209,10 +208,22 @@ export default function Login() {
             </button>
           </form>
 
+          {/* Counselor note */}
           <div style={{
-            textAlign: 'center', marginTop: 22,
-            fontSize: 13, color: '#a8896e',
+            marginTop: 18,
+            padding: '10px 14px',
+            background: 'rgba(160,120,80,0.07)',
+            borderRadius: 10,
+            border: '1px solid rgba(160,120,80,0.15)',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
+            <span style={{ fontSize: 15 }}>🩺</span>
+            <p style={{ margin: 0, fontSize: 12, color: '#7a5c44', lineHeight: 1.5 }}>
+              <strong>Counselors</strong> — use the email &amp; password provided by your admin to sign in here. You'll be redirected to your dashboard automatically.
+            </p>
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 18, fontSize: 13, color: '#a8896e' }}>
             New to MindCare?{' '}
             <Link to="/register" style={{ color: '#a07850', fontWeight: 600, textDecoration: 'none' }}>
               Create an account
@@ -220,17 +231,15 @@ export default function Login() {
           </div>
         </div>
 
+        {/* Admin portal */}
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Link to="/admin-login" style={{
             display: 'inline-flex', alignItems: 'center', gap: 7,
             background: 'rgba(255,252,248,0.7)',
             border: '1px solid rgba(160,120,80,0.2)',
-            borderRadius: 30,
-            padding: '8px 20px',
+            borderRadius: 30, padding: '8px 20px',
             fontSize: 12, color: '#a8896e',
-            textDecoration: 'none',
-            backdropFilter: 'blur(8px)',
-            transition: 'all 0.15s',
+            textDecoration: 'none', backdropFilter: 'blur(8px)', transition: 'all 0.15s',
           }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(160,120,80,0.4)'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(160,120,80,0.2)'; }}
@@ -251,7 +260,7 @@ export default function Login() {
       </div>
 
       <style>{`
-        @keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
+        @keyframes spin  { from { transform: rotate(0) }   to { transform: rotate(360deg) } }
         @keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }
       `}</style>
     </div>

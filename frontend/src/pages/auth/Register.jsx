@@ -49,7 +49,7 @@ export default function Register() {
       // Uses 'class' (not 'class_year') to match the DB schema
       const { error: profileError } = await supabase
         .from('user_profiles')
-        .insert({
+        .upsert({
           id:        authData.user.id,
           email:     form.email.trim().toLowerCase(),
           full_name: form.full_name.trim(),

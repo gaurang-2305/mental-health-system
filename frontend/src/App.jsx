@@ -18,6 +18,7 @@ import Chatbot       from './pages/shared/Chatbot';
 import Notifications from './pages/shared/Notifications';
 
 // ─── Student pages ────────────────────────────────────────────────────────────
+
 import Dashboard        from './pages/student/Dashboard';
 import MoodTracker      from './pages/student/MoodTracker';
 import Survey           from './pages/student/Survey';
@@ -34,6 +35,7 @@ import Feedback         from './pages/student/Feedback';
 import WeeklyReport     from './pages/student/WeeklyReport';
 
 // ─── Counselor pages ──────────────────────────────────────────────────────────
+import AdminCounselors from './pages/admin/AdminCounselors';
 import CounselorDashboard from './pages/counselor/CounselorDashboard';
 import CrisisAlerts       from './pages/counselor/CrisisAlerts';
 import ManageAppointments from './pages/counselor/ManageAppointments';
@@ -138,6 +140,7 @@ export default function App() {
               <Route path="/student/notifications"   element={<RequireAuth allowedRoles={['student']}><Notifications /></RequireAuth>} />
 
               {/* ── Counselor ── */}
+              
               <Route path="/counselor"               element={<RequireAuth allowedRoles={['counselor']}><CounselorDashboard /></RequireAuth>} />
               <Route path="/counselor/alerts"        element={<RequireAuth allowedRoles={['counselor']}><CrisisAlerts /></RequireAuth>} />
               <Route path="/counselor/appointments"  element={<RequireAuth allowedRoles={['counselor']}><ManageAppointments /></RequireAuth>} />
@@ -150,6 +153,7 @@ export default function App() {
               {/* ── Admin ── */}
               <Route path="/admin"               element={<RequireAuth allowedRoles={['admin']}><AdminDashboard /></RequireAuth>} />
               <Route path="/admin/users"         element={<RequireAuth allowedRoles={['admin']}><ManageUsers /></RequireAuth>} />
+              <Route path="/admin/counselors"    element={<RequireAuth allowedRoles={['admin']}><AdminCounselors /></RequireAuth>} />
               <Route path="/admin/analytics"     element={<RequireAuth allowedRoles={['admin']}><Analytics /></RequireAuth>} />
               <Route path="/admin/alerts"        element={<RequireAuth allowedRoles={['admin']}><AdminCrisisAlerts /></RequireAuth>} />
               <Route path="/admin/export"        element={<RequireAuth allowedRoles={['admin']}><ExportReports /></RequireAuth>} />
