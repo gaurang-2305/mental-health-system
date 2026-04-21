@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { saveChatMessage, getChatHistory } from '../../services/dataService';
+import { getChatHistory, saveChatMessage } from '../../services/dataService';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const QUICK_MESSAGES = [
   "I'm feeling stressed about exams",
@@ -11,70 +13,81 @@ const QUICK_MESSAGES = [
   "How can I improve my mood?",
 ];
 
-const CRISIS_KEYWORDS = ['suicide', 'kill myself', 'end my life', 'want to die', 'self-harm', 'hurt myself'];
-
-const CRISIS_REPLY = `I'm really glad you reached out. What you're feeling sounds very serious, and your life matters deeply. 💙
-
-Please contact a crisis helpline right now:
-• iCall: 9152987821
-• Vandrevala Foundation: 1860-2662-345 (24/7, free)
-• Emergency services: 112
-
-I'm here with you, but you deserve real human support right now.`;
-
-async function callClaude(messages, studentName) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+async function callBackendChatbot(message, history, token) {
+  const res = await fetch(`${API_BASE}/chatbot/message`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      system: `You are MindCare AI, a compassionate mental health support chatbot for university students in India. 
-- Give warm, empathetic responses (3-5 sentences max)
-- Offer practical coping strategies when helpful
-- Never diagnose or prescribe
-- The student's name is ${studentName}
-- Vary your responses — don't repeat the same phrases`,
-      messages: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+      message,
+      conversation_history: history.slice(-10).map(m => ({
+        role:    m.role,
+        message: m.content,
+      })),
     }),
   });
-  if (!response.ok) throw new Error(`${response.status}`);
-  const data = await response.json();
-  return data.content?.[0]?.text?.trim() || '';
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Server error ${res.status}`);
+  }
+
+  const data = await res.json();
+  return { reply: data.reply, isCrisis: data.is_crisis };
 }
 
 export default function Chatbot() {
   const { profile } = useAuth();
-  const [messages, setMessages] = useState([]);
-  const [input, setInput]       = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const bottomRef  = useRef(null);
-  const sendingRef = useRef(false); // prevents duplicate sends
-  const studentName = profile?.full_name?.split(' ')[0] || 'there';
+  const [messages, setMessages]     = useState([]);
+  const [input, setInput]           = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [fetching, setFetching]     = useState(true);
+  const bottomRef                   = useRef(null);
+  const sendingRef                  = useRef(false);
+  const studentName                 = profile?.full_name?.split(' ')[0] || 'there';
 
-  // Load chat history once
+  // Get the Supabase session token
+  async function getToken() {
+    const { supabase } = await import('../../services/supabaseClient');
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || '';
+  }
+
+  // Load chat history on mount
   useEffect(() => {
     if (!profile?.id) return;
     let mounted = true;
-    getChatHistory(profile.id).then(hist => {
-      if (!mounted) return;
-      if (hist.length === 0) {
+    getChatHistory(profile.id)
+      .then(hist => {
+        if (!mounted) return;
+        if (hist.length === 0) {
+          setMessages([{
+            id:      'welcome',
+            role:    'assistant',
+            content: `Hello ${studentName}! 👋 I'm your MindCare AI companion. I'm here to listen and support you anytime. How are you feeling today?`,
+          }]);
+        } else {
+          setMessages(hist.map((h, i) => ({
+            id:      `h-${i}`,
+            role:    h.role,
+            content: h.message,
+          })));
+        }
+        setFetching(false);
+      })
+      .catch(() => {
+        if (!mounted) return;
         setMessages([{
-          id: 'welcome', role: 'assistant',
-          content: `Hello ${studentName}! 👋 I'm your MindCare AI companion. I'm here to listen and support you anytime. How are you feeling today?`,
+          id:      'welcome',
+          role:    'assistant',
+          content: `Hello ${studentName}! 👋 I'm MindCare AI. How can I support you today?`,
         }]);
-      } else {
-        setMessages(hist.map((h, i) => ({ id: `h-${i}`, role: h.role, content: h.message })));
-      }
-      setFetching(false);
-    }).catch(() => {
-      if (!mounted) return;
-      setMessages([{ id: 'welcome', role: 'assistant', content: `Hello ${studentName}! 👋 I'm MindCare AI. How can I support you today?` }]);
-      setFetching(false);
-    });
+        setFetching(false);
+      });
     return () => { mounted = false; };
-  }, [profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,7 +97,6 @@ export default function Chatbot() {
     const userMsg = (text || input).trim();
     if (!userMsg || loading || sendingRef.current) return;
 
-    // Lock to prevent duplicate calls
     sendingRef.current = true;
     setInput('');
     setLoading(true);
@@ -92,44 +104,22 @@ export default function Chatbot() {
     const userEntry = { id: `u-${Date.now()}`, role: 'user', content: userMsg };
     setMessages(prev => [...prev, userEntry]);
 
-    // Crisis detection
-    const isCrisis = CRISIS_KEYWORDS.some(kw => userMsg.toLowerCase().includes(kw));
-    if (isCrisis) {
-      const crisisEntry = { id: `a-${Date.now()}`, role: 'assistant', content: CRISIS_REPLY };
-      setMessages(prev => [...prev, crisisEntry]);
-      if (profile?.id) {
-        saveChatMessage(profile.id, userMsg, 'user').catch(() => {});
-        saveChatMessage(profile.id, CRISIS_REPLY, 'assistant').catch(() => {});
-      }
-      setLoading(false);
-      sendingRef.current = false;
-      return;
-    }
-
     try {
-      if (profile?.id) saveChatMessage(profile.id, userMsg, 'user').catch(() => {});
+      const token = await getToken();
+      const { reply, isCrisis } = await callBackendChatbot(userMsg, messages, token);
 
-      // Build context from current messages + new user message
-      const contextMsgs = [...messages.slice(-8), userEntry]
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role, content: m.content }));
+      const aiEntry = { id: `a-${Date.now()}`, role: 'assistant', content: reply };
+      setMessages(prev => [...prev, aiEntry]);
 
-      const reply = await callClaude(contextMsgs, studentName);
-
-      if (reply) {
-        const aiEntry = { id: `a-${Date.now()}`, role: 'assistant', content: reply };
-        setMessages(prev => [...prev, aiEntry]);
-        if (profile?.id) saveChatMessage(profile.id, reply, 'assistant').catch(() => {});
-      }
     } catch (err) {
-      console.error('Claude error:', err);
-      const fallback = `${studentName}, I hear you. It sounds like you're going through something difficult. Try taking a slow deep breath — inhale for 4 counts, hold for 4, exhale for 6. Would you like to talk more about what's on your mind?`;
+      console.error('Chatbot error:', err);
+      const fallback = `${studentName}, I hear you. Try taking a slow deep breath — inhale for 4 counts, hold for 4, exhale for 6. Would you like to talk more about what's on your mind?`;
       setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: fallback }]);
     } finally {
       setLoading(false);
       sendingRef.current = false;
     }
-  }, [input, loading, messages, profile?.id, studentName]);
+  }, [input, loading, messages, studentName]);
 
   if (fetching) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh', flexDirection: 'column', gap: 12 }}>
@@ -144,16 +134,13 @@ export default function Chatbot() {
       {/* Header */}
       <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg2)' }}>
         <h1 style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', marginBottom: 2 }}>💬 AI Mental Wellness Chatbot</h1>
-        <p style={{ color: 'var(--text2)', fontSize: 12 }}>Available 24/7 · Completely confidential · Powered by Claude AI</p>
+        <p style={{ color: 'var(--text2)', fontSize: 12 }}>Available 24/7 · Completely confidential · Powered by Grok AI</p>
       </div>
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {messages.map(msg => (
-          <div key={msg.id} style={{
-            display: 'flex', gap: 10,
-            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-          }}>
+          <div key={msg.id} style={{ display: 'flex', gap: 10, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {msg.role === 'assistant' && (
               <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#4f8ef7,#7c5cbf)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0, alignSelf: 'flex-end' }}>🤖</div>
             )}
@@ -163,8 +150,7 @@ export default function Chatbot() {
               background: msg.role === 'user' ? 'var(--primary)' : 'var(--bg2)',
               border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
               color: msg.role === 'user' ? '#fff' : 'var(--text)',
-              fontSize: 14, lineHeight: 1.6,
-              whiteSpace: 'pre-wrap',
+              fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap',
             }}>
               {msg.content}
             </div>
@@ -190,7 +176,7 @@ export default function Chatbot() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick replies — only shown on fresh chat */}
+      {/* Quick replies */}
       {messages.length <= 2 && !loading && (
         <div style={{ padding: '8px 24px', display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
           <span style={{ fontSize: 11, color: 'var(--text3)', alignSelf: 'center' }}>Try:</span>

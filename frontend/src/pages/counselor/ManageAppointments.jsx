@@ -11,20 +11,19 @@ const ago     = d => { if(!d)return'—'; const s=Math.floor((Date.now()-new Dat
 export default function ManageAppointments() {
   const { profile } = useAuth();
   const [appointments, setAppts] = useState([]);
-  const [students, setStudents]  = useState({});   // id → profile
+  const [students, setStudents]  = useState({});
   const [loading, setLoading]    = useState(true);
   const [error, setError]        = useState('');
   const [activeTab, setActiveTab]= useState('Pending');
 
   useEffect(() => {
     if (profile?.id) fetchData();
-  }, [profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
 
   async function fetchData() {
     setLoading(true);
     setError('');
     try {
-      // Fetch appointments for this counselor (no FK join — fetch students separately)
       const { data: apptData, error: apptErr } = await supabase
         .from('appointments')
         .select('*')
@@ -36,7 +35,6 @@ export default function ManageAppointments() {
       const appts = apptData || [];
       setAppts(appts);
 
-      // Fetch student profiles separately to avoid FK naming issues
       const studentIds = [...new Set(appts.map(a => a.student_id).filter(Boolean))];
       if (studentIds.length > 0) {
         const { data: profileData } = await supabase
@@ -72,7 +70,9 @@ export default function ManageAppointments() {
     <div style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 4 }}>Manage Appointments</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 4 }}>
+          Manage Appointments
+        </h1>
         <p style={{ color: 'var(--text2)', fontSize: 13 }}>
           {pendingCount} appointment{pendingCount !== 1 ? 's' : ''} (pending)
         </p>
@@ -80,25 +80,66 @@ export default function ManageAppointments() {
 
       {/* Error */}
       {error && (
-        <div style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span style={{ color: '#f87171', fontSize: 13, flex: 1 }}>⚠️ {error}</span>
-          <button onClick={() => { setError(''); fetchData(); }} style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 8, color: '#f87171', cursor: 'pointer', padding: '4px 12px', fontSize: 12 }}>Retry</button>
+        <div style={{
+          background: 'rgba(248,113,113,0.12)',
+          border: '1px solid rgba(248,113,113,0.4)',
+          borderRadius: 10,
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center'
+        }}>
+          <span style={{ color: '#f87171', fontSize: 13, flex: 1 }}>
+            ⚠️ {error}
+          </span>
+          <button
+            onClick={() => { setError(''); fetchData(); }}
+            style={{
+              background: 'none',
+              border: '1px solid rgba(248,113,113,0.4)',
+              borderRadius: 8,
+              color: '#f87171',
+              cursor: 'pointer',
+              padding: '4px 12px',
+              fontSize: 12
+            }}>
+            Retry
+          </button>
         </div>
       )}
 
-      {/* Status filter tabs */}
+      {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {STATUS_TABS.map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
             style={{
-              padding: '7px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === tab ? 600 : 400,
+              padding: '7px 16px',
+              borderRadius: 20,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: activeTab === tab ? 600 : 400,
               background: activeTab === tab ? 'var(--primary)' : 'var(--bg2)',
               color: activeTab === tab ? '#fff' : 'var(--text2)',
-              border: activeTab === tab ? 'none' : '1px solid var(--border)',
+              border: activeTab === tab ? 'none' : '1px solid var(--border)', // ✅ fixed
             }}>
             {tab}
             {tab === 'Pending' && pendingCount > 0 && (
-              <span style={{ marginLeft: 6, background: '#fbbf24', color: '#000', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+              <span style={{
+                marginLeft: 6,
+                background: '#fbbf24',
+                color: '#000',
+                borderRadius: '50%',
+                width: 18,
+                height: 18,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 10,
+                fontWeight: 700
+              }}>
                 {pendingCount}
               </span>
             )}
@@ -107,10 +148,23 @@ export default function ManageAppointments() {
       </div>
 
       {/* Content */}
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{
+        background: 'var(--bg2)',
+        border: '1px solid var(--border)',
+        borderRadius: 14,
+        overflow: 'hidden'
+      }}>
         {loading ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--text3)' }}>
-            <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
+            <div style={{
+              width: 32,
+              height: 32,
+              border: '3px solid rgba(255,255,255,0.1)',
+              borderTopColor: 'var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 0.7s linear infinite',
+              margin: '0 auto 12px'
+            }} />
             <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
             Loading appointments...
           </div>
@@ -126,17 +180,32 @@ export default function ManageAppointments() {
               const sc = statusColor[a.status] || 'var(--text3)';
               return (
                 <div key={a.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '16px 20px',
                   borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
                 }}>
-                  {/* Student avatar */}
-                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  <div style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: '50%',
+                    background: 'var(--primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#fff',
+                    flexShrink: 0
+                  }}>
                     {student?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
                   </div>
 
-                  {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{student?.full_name || 'Unknown student'}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                      {student?.full_name || 'Unknown student'}
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                       {student?.email} {student?.class ? `· ${student.class}` : ''}
                     </div>
@@ -146,26 +215,32 @@ export default function ManageAppointments() {
                     </div>
                   </div>
 
-                  {/* Status + actions */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: `${sc}20`, padding: '3px 10px', borderRadius: 20, textTransform: 'capitalize' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: sc,
+                      background: `${sc}20`,
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      textTransform: 'capitalize'
+                    }}>
                       {a.status}
                     </span>
+
                     {a.status === 'pending' && (
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => updateStatus(a.id, 'confirmed')}
-                          style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'rgba(52,211,153,0.15)', color: '#34d399', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        <button onClick={() => updateStatus(a.id, 'confirmed')}>
                           ✓ Confirm
                         </button>
-                        <button onClick={() => updateStatus(a.id, 'cancelled')}
-                          style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'rgba(248,113,113,0.12)', color: '#f87171', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        <button onClick={() => updateStatus(a.id, 'cancelled')}>
                           ✕ Cancel
                         </button>
                       </div>
                     )}
+
                     {a.status === 'confirmed' && (
-                      <button onClick={() => updateStatus(a.id, 'completed')}
-                        style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'rgba(79,142,247,0.15)', color: 'var(--primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      <button onClick={() => updateStatus(a.id, 'completed')}>
                         Mark Complete
                       </button>
                     )}

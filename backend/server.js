@@ -1,79 +1,84 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+require('dotenv').config();
+const express    = require('express');
+const cors       = require('cors');
+const helmet     = require('helmet');
+const morgan     = require('morgan');
 
-// Routes
-import authRoutes from './routes/auth.js';
-import moodRoutes from './routes/mood.js';
-import surveyRoutes from './routes/surveys.js';
-import chatRoutes from './routes/chat.js';
-import alertRoutes from './routes/alerts.js';
-import journalRoutes from './routes/journal.js';
-import analyticsRoutes from './routes/analytics.js';
-import miscRoutes from './routes/misc.js';
-import appointmentRoutes from './routes/appointments.js';
-import counselorRoutes from './routes/counselors.js'; // NEW
+const authRoutes         = require('./routes/auth.routes');
+const moodRoutes         = require('./routes/mood.routes');
+const surveyRoutes       = require('./routes/survey.routes');
+const chatbotRoutes      = require('./routes/chatbot.routes');
+const crisisRoutes       = require('./routes/crisis.routes');
+const journalRoutes      = require('./routes/journal.routes');
+const appointmentRoutes  = require('./routes/appointment.routes');
+const counselorRoutes    = require('./routes/counselor.routes');
+const adminRoutes        = require('./routes/admin.routes');
+const studentRoutes      = require('./routes/student.routes');
+const stressRoutes       = require('./routes/stress.routes');
+const sleepRoutes        = require('./routes/sleep.routes');
+const lifestyleRoutes    = require('./routes/lifestyle.routes');
+const goalRoutes         = require('./routes/goals.routes');
+const forumRoutes        = require('./routes/forum.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const recommendationRoutes = require('./routes/recommendation.routes');
+const reportRoutes       = require('./routes/report.routes');
+const surveyRoute        = require('./routes/survey.routes');
+const feedbackRoutes     = require('./routes/feedback.routes');
+const gamesRoutes        = require('./routes/games.routes');
+const attendanceRoutes   = require('./routes/attendance.routes');
+const academicRoutes     = require('./routes/academic.routes');
+const moodPredictionRoutes = require('./routes/moodPrediction.routes');
+const symptomRoutes      = require('./routes/symptom.routes');
+const languageRoutes     = require('./routes/language.routes');
+const backupRoutes       = require('./routes/backup.routes');
+const { defaultLimiter } = require('./middleware/rateLimiter');
+const { errorHandler }   = require('./middleware/errorHandler');
+const requestLogger      = require('./middleware/logger');
+const corsMiddleware     = require('./config/cors');
 
-dotenv.config();
-
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 5000;
 
-// ============================================================
-// Middleware
-// ============================================================
 app.use(helmet());
+app.use(corsMiddleware);
 app.use(morgan('combined'));
-app.use(cors({
-  origin: [process.env.FRONTEND_URL || 'http://localhost:5173', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(requestLogger);
+app.use('/api/', defaultLimiter);
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { error: 'Too many requests, please try again later' }
-});
-const aiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  message: { error: 'AI rate limit exceeded, please wait a moment' }
-});
-
-app.use('/api/', limiter);
-app.use('/api/chat', aiLimiter);
-
-// ============================================================
-// Routes
-// ============================================================
-app.use('/api/auth', authRoutes);
-app.use('/api/mood', moodRoutes);
-app.use('/api/surveys', surveyRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/alerts', alertRoutes);
-app.use('/api/journal', journalRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/counselors', counselorRoutes); // NEW — must be before /api misc catch-all
-app.use('/api', miscRoutes);
+app.use('/api/auth',           authRoutes);
+app.use('/api/mood',           moodRoutes);
+app.use('/api/surveys',        surveyRoutes);
+app.use('/api/chatbot',        chatbotRoutes);
+app.use('/api/crisis',         crisisRoutes);
+app.use('/api/journal',        journalRoutes);
+app.use('/api/appointments',   appointmentRoutes);
+app.use('/api/counselor',      counselorRoutes);
+app.use('/api/admin',          adminRoutes);
+app.use('/api/students',       studentRoutes);
+app.use('/api/stress',         stressRoutes);
+app.use('/api/sleep',          sleepRoutes);
+app.use('/api/lifestyle',      lifestyleRoutes);
+app.use('/api/goals',          goalRoutes);
+app.use('/api/forum',          forumRoutes);
+app.use('/api/notifications',  notificationRoutes);
+app.use('/api/recommendations',recommendationRoutes);
+app.use('/api/reports',        reportRoutes);
+app.use('/api/feedback',       feedbackRoutes);
+app.use('/api/games',          gamesRoutes);
+app.use('/api/attendance',     attendanceRoutes);
+app.use('/api/academic',       academicRoutes);
+app.use('/api/mood-prediction',moodPredictionRoutes);
+app.use('/api/symptoms',       symptomRoutes);
+app.use('/api/language',       languageRoutes);
+app.use('/api/backup',         backupRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString(), service: 'MindCare Mental Health API' });
 });
 
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-  });
-});
+app.use(errorHandler);
 
 app.use('*', (req, res) => {
   res.status(404).json({ error: `Route ${req.originalUrl} not found` });
@@ -84,10 +89,10 @@ app.listen(PORT, () => {
 🧠 MindCare Mental Health API
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚀 Server running on port ${PORT}
-🌍 Environment: ${process.env.NODE_ENV}
+🌍 Environment: ${process.env.NODE_ENV || 'development'}
 📡 Health: http://localhost:${PORT}/health
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
 });
 
-export default app;
+module.exports = app;
