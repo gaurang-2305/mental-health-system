@@ -32,13 +32,19 @@ async function grokChat(messages, opts = {}) {
           Authorization: `Bearer ${process.env.GROK_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        timeout: 30000,
+        timeout: 45000, // increased from 30s — Grok can be slow
       });
-      return response.data.choices[0].message.content;
+
+      const content = response.data.choices[0].message.content;
+      if (!content || content.trim() === '') {
+        throw new Error('Grok returned empty content');
+      }
+      return content;
     } catch (err) {
       lastError = err;
       if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        const delay = 1200 * (attempt + 1); // slightly longer backoff
+        await new Promise(r => setTimeout(r, delay));
       }
     }
   }
@@ -46,7 +52,7 @@ async function grokChat(messages, opts = {}) {
 }
 
 /**
- * Parse JSON from Grok response — strips markdown fences
+ * Parse JSON from Grok response — strips markdown fences, finds array or object
  */
 async function grokJSON(messages, opts = {}) {
   const raw     = await grokChat(messages, { ...opts, temperature: 0.3 });
@@ -54,9 +60,12 @@ async function grokJSON(messages, opts = {}) {
   try {
     return JSON.parse(cleaned);
   } catch {
-    const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    // Try to find JSON object or array
+    const objMatch = cleaned.match(/\{[\s\S]*\}/);
+    const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+    const match = arrMatch || objMatch;
     if (match) return JSON.parse(match[0]);
-    throw new Error('Failed to parse JSON from Grok');
+    throw new Error('Failed to parse JSON from Grok response');
   }
 }
 
