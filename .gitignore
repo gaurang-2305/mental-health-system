@@ -5,3 +5,8 @@ dist/
 build/
 *.log
 .DS_Store
+frontend/.env
+backend/.env
+backend/exports/
+backend/backups/
+backend/logs/

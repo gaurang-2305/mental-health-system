@@ -85,14 +85,13 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`
-🧠 MindCare Mental Health API
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 Server running on port ${PORT}
-🌍 Environment: ${process.env.NODE_ENV || 'development'}
-📡 Health: http://localhost:${PORT}/health
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  `);
+  console.log(`Server running on port ${PORT}`);
+  
+  // Start cron jobs only in production
+  if (process.env.NODE_ENV === 'production') {
+    const { startCronJobs } = require('./services/backupService');
+    startCronJobs();
+  }
 });
 
 module.exports = app;
